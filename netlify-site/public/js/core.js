@@ -153,7 +153,7 @@ export const SETTING_FIELDS = {
   label_valid:     ["Valid Upto :", 30, false, "back", "Label: valid upto"],
   label_emergency: ["Emergency Contact No.", 40, false, "back", "Label: emergency contact"],
   label_address:   ["Address :", 30, false, "back", "Label: address"],
-  return_text:     ["If found Please return to :-\nTransport Deptt. Chandigarh\nUniversity, Gharuan, Mohali, Punjab", 400, true, "back", "Return instructions (one line per row)"],
+  return_text:     ["If found Please return to :-\nTransport Department\nChandigarh University, Unnao\nUttar Pradesh", 400, true, "back", "Return instructions (one line per row)"],
   contact_label:   ["Contact No.", 40, false, "back", "Label: contact number"],
   contact_value:   ["0160-3044444 Ext. 416", 40, false, "back", "Contact number"],
   helpline_label:  ["Transport Helpline number:", 50, false, "back", "Label: helpline"],
