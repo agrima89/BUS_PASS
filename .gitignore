@@ -9,3 +9,6 @@ backups/
 .claude/
 backups/
 *.log
+
+# Official seal/signature scans: upload via Card Settings, never commit
+branding/transport-seal*

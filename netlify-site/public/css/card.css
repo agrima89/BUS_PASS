@@ -106,3 +106,13 @@
 .bp-pair-slot::after { content: ""; position: absolute; left: 85.6mm; top: 0; bottom: 0;
   border-left: .2mm dashed #9aa0a6; }          /* fold / cut guide between front and back */
 .bp-pair-page { position: relative; width: 210mm; height: 297mm; background: #fff; overflow: hidden; }
+
+/* ---------- Text-only front (no underlines) + logo footer ---------- */
+.bp-val { border-bottom: 0; padding-bottom: 0; }
+.bp-row { height: 3.35mm; }
+/* Seal + signature: wider box, the signature extends beyond the ring. */
+.bp-front-seal { left: 60mm; top: 32.5mm; width: 23mm; height: 18.5mm; border-radius: 0; }
+.bp-front-seal:not(:has(img)) { border-radius: 50%; width: 18mm; left: 62.5mm; }
+.bp-footer { position: absolute; left: 4.9mm; top: 44.6mm; height: 7mm; display: flex; align-items: center; gap: 1.6mm; }
+.bp-footer img { height: 7mm; width: auto; }
+.bp-footer span { font-size: 2.9mm; font-weight: 800; letter-spacing: .1mm; color: #222; max-width: 45mm; text-transform: uppercase; }

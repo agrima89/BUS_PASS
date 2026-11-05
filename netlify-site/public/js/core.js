@@ -147,7 +147,8 @@ export const SETTING_FIELDS = {
   label_uid:       ["UID:", 30, false, "front", "Label: UID"],
   label_pickup:    ["Pickup Point:", 30, false, "front", "Label: pickup point"],
   print_pass_no:   ["no", 3, false, "front", "Also print the system pass code? (yes / no; normally no)"],
-  seal_position:   ["back", 5, false, "front", "Where to print the seal: back / front / both / none"],
+  seal_position:   ["front", 5, false, "front", "Where to print the seal: front / back / both / none"],
+  footer_text:     ["Transport Department", 40, false, "front", "Text beside the logo at the bottom of the front"],
   signatory_label: ["", 40, false, "front", "Signatory title under the front seal (e.g. Assistant General Manager)"],
   label_valid:     ["Valid Upto :", 30, false, "back", "Label: valid upto"],
   label_emergency: ["Emergency Contact No.", 40, false, "back", "Label: emergency contact"],
@@ -234,6 +235,7 @@ export function cardFront(c, s) {
     ${/^y/i.test(s.print_pass_no) ? `<div class="bp-passno fit">${esc(c.pass_code)}</div>` : ""}
     ${/^(front|both)$/i.test(s.seal_position) ? `<div class="bp-front-seal">${s.seal_image ? `<img src="${esc(s.seal_image)}" alt="Seal">` : ""}</div>` : ""}
     ${s.signatory_label ? `<div class="bp-signatory fit">${esc(s.signatory_label)}</div>` : ""}
+    ${s.footer_text ? `<div class="bp-footer"><img src="/img/cu-emblem.png" alt=""><span class="fit">${esc(s.footer_text)}</span></div>` : ""}
     <div class="bp-photo"><img alt="" data-out-photo ${c.photo_url ? `src="${esc(c.photo_url)}"` : "hidden"}></div>
     <div class="bp-fields">
       ${row(esc(s.label_name), "name", c.name)}
@@ -260,7 +262,7 @@ export function cardBack(c, s) {
     <div class="bp-address fit-box" data-out="address">${c.address.map(esc).join("<br>")}</div>
     <div class="bp-return fit-box">${ret.join("")}</div>
     ${notes.length ? `<div class="bp-note fit-box"><span class="bp-note-label">${esc(s.note_label)}</span><div class="bp-note-lines">${notes.map(n => `<div>${esc(n)}</div>`).join("")}</div></div>` : ""}
-    ${/^(back|both)$/i.test(s.seal_position || "back") ? `<div class="bp-seal">${s.seal_image ? `<img src="${esc(s.seal_image)}" alt="Seal">` : "<span>SEAL</span>"}</div>` : ""}
+    ${/^(back|both)$/i.test(s.seal_position || "") ? `<div class="bp-seal">${s.seal_image ? `<img src="${esc(s.seal_image)}" alt="Seal">` : "<span>SEAL</span>"}</div>` : ""}
     <div class="bp-qr">${c.qr_svg || `<div class="bp-qr-placeholder">QR</div>`}${s.qr_caption ? `<div class="bp-qr-caption">${esc(s.qr_caption)}</div>` : ""}</div>
   </div>`;
 }
