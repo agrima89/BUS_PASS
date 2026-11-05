@@ -116,3 +116,8 @@
 .bp-footer { position: absolute; left: 4.9mm; top: 44.6mm; height: 7mm; display: flex; align-items: center; gap: 1.6mm; }
 .bp-footer img { height: 7mm; width: auto; }
 .bp-footer span { font-size: 2.9mm; font-weight: 800; letter-spacing: .1mm; color: #222; max-width: 45mm; text-transform: uppercase; }
+
+/* ---------- Seal placement as on the issued card: lower right, overlapping the
+   end of the Pickup Point line, title underneath ---------- */
+.bp-front-seal { left: 61.5mm; top: 35.2mm; width: 21.5mm; height: 15.2mm; }
+.bp-signatory { left: 49mm; top: 50.6mm; width: 34mm; text-align: center; font-size: 2.1mm; }
