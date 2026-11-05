@@ -1,0 +1,7 @@
+# Root config: tells Netlify the site lives in netlify-site/.
+# Netlify then also reads netlify-site/netlify.toml (publish dir, functions, headers).
+[build]
+  base      = "netlify-site"
+  publish   = "public"
+  functions = "netlify/functions"
+  command   = ""
