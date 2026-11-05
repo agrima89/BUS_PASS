@@ -53,6 +53,11 @@ or only `netlify-site/`). The `.gitignore` files keep secrets and local data out
 4. **Deploys → Trigger deploy**. When it's done, open the site URL (e.g. `https://cu-buspass.netlify.app`).
 5. Back in Supabase: **Authentication → URL Configuration → Site URL**, then paste your Netlify URL.
 
+## Updating an existing project
+
+If you created the Supabase project before the **buggy pass number** feature, run
+`supabase/update-1-buggy-number.sql` once in **SQL Editor** (safe to run twice).
+
 ## 4. First use
 
 1. Open the site and sign in with the account from step 1.4.

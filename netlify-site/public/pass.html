@@ -22,7 +22,7 @@
             <div><p class="bp-side-label">Front</p><div class="bp-zoom" id="front"></div></div>
             <div><p class="bp-side-label">Back</p><div class="bp-zoom" id="back"></div></div>
           </div>
-          <p class="hint">Shown scaled to fit. It prints at 85.6 × 54 mm. For a PDF, click <b>Print card</b> and choose <b>Save as PDF</b>.</p>
+          <p class="hint">Shown scaled to fit. It prints at 85.6 × 54 mm. For a PDF, click <b>Print card</b> and choose <b>Save as PDF</b> in the print dialog.</p>
         </div>
         <div class="card">
           <div class="card-head"><h2>Details</h2><span id="statusBadge"></span></div>
@@ -58,7 +58,7 @@
       <dt>QR</dt><dd>${p.qr_mode === "offline" ? "Offline: readable by any phone, no internet needed" : "Online: opens the verify page"}</dd>`;
     const missing = missingFor(s);
     if (p.status === "valid") {
-      $("#actions").innerHTML = `<a class="btn" href="/print.html?layout=a4&ids=${p.id}">⎙ A4 sheet</a> <a class="btn btn-primary" href="/print.html?layout=single&ids=${p.id}">⎙ Print card</a>`;
+      $("#actions").innerHTML = `<a class="btn" href="/print.html?layout=card&ids=${p.id}">Card printer</a> <a class="btn btn-primary" href="/print.html?layout=pairs&ids=${p.id}">⎙ Print card (front | back)</a>`;
       $("#extra").innerHTML = (missing.length ? `<div class="flash flash-error">Now missing: ${esc(missing.join(", "))}. <a href="/student.html?id=${s.id}">Complete the record</a> before printing.</div>` : "") +
         `<button class="btn btn-danger" id="revoke">Revoke pass</button>
          <p class="hint">Revoking makes this QR show as not valid. To replace a lost card, revoke it, then use <b>Create pass</b> on the Students page.</p>`;

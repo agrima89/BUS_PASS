@@ -16,7 +16,7 @@
     <div class="flashes" id="flash"></div>
     <section class="content">
       <div class="card">
-        <div class="search"><input type="search" id="q" placeholder="Search by name, UID, program or pickup point…" aria-label="Search"></div>
+        <div class="search"><input type="search" id="q" placeholder="Search by buggy no., name, UID, program or pickup point…" aria-label="Search"></div>
         <div id="list"><p class="empty">Loading…</p></div>
       </div>
     </section>
@@ -39,13 +39,13 @@
 
   function render() {
     const q = $("#q").value.trim().toLowerCase();
-    const list = rows.filter(r => !q || [r.full_name, r.roll_number, r.program, r.pickup_points?.name]
+    const list = rows.filter(r => !q || [r.buggy_pass_no, r.full_name, r.roll_number, r.program, r.pickup_points?.name]
       .some(v => (v || "").toLowerCase().includes(q)));
     if (!list.length) {
       $("#list").innerHTML = `<p class="empty">${rows.length ? "No students match your search." : 'No students yet. <a href="/student.html">Add the first one.</a>'}</p>`;
       return;
     }
-    $("#list").innerHTML = `<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Name</th><th>UID</th><th>Class / Program</th><th>Pickup point</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>${
+    $("#list").innerHTML = `<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Buggy No.</th><th>Name</th><th>UID</th><th>Class / Program</th><th>Pickup point</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>${
       list.map(r => {
         const pass = r.passes?.find(p => p.status === "valid");
         const missing = missingFor(r);
@@ -55,7 +55,7 @@
         else if (r.status !== "active") action = "";
         else if (missing.length) action = `<a class="btn btn-sm btn-warn" href="/student.html?id=${r.id}" title="Missing: ${esc(missing.join(", "))}">⚠ Incomplete (${missing.length})</a>`;
         else action = `<button class="btn btn-sm btn-primary" data-issue="${r.id}">Create pass</button>`;
-        return `<tr><td class="thumb-cell">${thumb}</td><td>${esc(r.full_name)}<div class="sub">${esc(r.department || "")}</div></td>
+        return `<tr><td class="thumb-cell">${thumb}</td><td class="mono"><b>${esc(r.buggy_pass_no || "—")}</b></td><td>${esc(r.full_name)}<div class="sub">${esc(r.department || "")}</div></td>
           <td class="mono">${esc(r.roll_number)}</td><td>${esc(r.program)}</td><td>${esc(r.pickup_points?.name || "—")}</td>
           <td>${esc(dmy(r.valid_until) || "—")}</td><td><span class="badge badge-${esc(r.status)}">${esc(r.status)}</span></td>
           <td class="row-actions">${action}<a class="btn btn-sm" href="/student.html?id=${r.id}">Edit</a></td></tr>`;

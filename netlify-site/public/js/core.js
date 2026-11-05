@@ -44,6 +44,8 @@ function showPersistedFlash() {
 export function errText(e) {
   const m = e?.message || String(e);
   if (/duplicate key.*roll_number/i.test(m)) return "A student with that UID already exists.";
+  if (/duplicate key.*buggy_pass_no/i.test(m)) return "That buggy pass number is already given to another student.";
+  if (/column .*buggy_pass_no|pass_term.*does not exist|schema cache/i.test(m)) return "The database needs updating: run supabase/update-1-buggy-number.sql in Supabase (see SETUP.md).";
   if (/Failed to fetch|NetworkError/i.test(m)) return "Can't reach the server. Check the internet connection and try again.";
   if (/JWT|not authenticated|401/i.test(m)) return "Your session expired. Please sign in again.";
   return m;
@@ -144,17 +146,19 @@ export const SETTING_FIELDS = {
   label_class:     ["Class/Branch:", 30, false, "front", "Label: class/branch"],
   label_uid:       ["UID:", 30, false, "front", "Label: UID"],
   label_pickup:    ["Pickup Point:", 30, false, "front", "Label: pickup point"],
-  print_pass_no:   ["no", 3, false, "front", "Print the pass number on the card? (yes / no)"],
+  print_pass_no:   ["no", 3, false, "front", "Also print the system pass code? (yes / no; normally no)"],
+  seal_position:   ["back", 5, false, "front", "Where to print the seal: back / front / both / none"],
+  signatory_label: ["", 40, false, "front", "Signatory title under the front seal (e.g. Assistant General Manager)"],
   label_valid:     ["Valid Upto :", 30, false, "back", "Label: valid upto"],
   label_emergency: ["Emergency Contact No.", 40, false, "back", "Label: emergency contact"],
   label_address:   ["Address :", 30, false, "back", "Label: address"],
-  return_text:     ["", 400, true, "back", "Return instructions (one line per row)"],
+  return_text:     ["If found Please return to :-\nTransport Deptt. Chandigarh\nUniversity, Gharuan, Mohali, Punjab", 400, true, "back", "Return instructions (one line per row)"],
   contact_label:   ["Contact No.", 40, false, "back", "Label: contact number"],
-  contact_value:   ["", 40, false, "back", "Contact number"],
+  contact_value:   ["0160-3044444 Ext. 416", 40, false, "back", "Contact number"],
   helpline_label:  ["Transport Helpline number:", 50, false, "back", "Label: helpline"],
-  helpline_value:  ["", 40, false, "back", "Helpline number"],
+  helpline_value:  ["7087039349", 40, false, "back", "Helpline number"],
   note_label:      ["Note:", 20, false, "back", "Label: note"],
-  note_lines:      ["", 300, true, "back", "Note lines (one per row)"],
+  note_lines:      ["Must carry pass while travelling in buggy.\nPass is not transferable.", 300, true, "back", "Note lines (one per row)"],
   qr_caption:      ["Scan with any phone", 30, false, "back", "Caption under the QR code"],
   pass_prefix:     ["CU", 8, false, "back", "Pass number prefix"],
 };
@@ -163,6 +167,7 @@ export async function loadSettings() {
   const cfg = await loadConfig();
   const s = Object.fromEntries(Object.entries(SETTING_FIELDS).map(([k, v]) => [k, v[0]]));
   s.uni_name = cfg.universityName;
+  s.seal_image = "";
   const { data, error } = await sb.from("settings").select("key,value");
   if (error) throw error;
   for (const r of data || []) if (r.key in s && r.value !== null) s[r.key] = r.value;
@@ -171,7 +176,7 @@ export async function loadSettings() {
 
 /* -------------------------------------------------------- pass requirements */
 export const REQUIRED = [
-  ["photo_path", "photograph"], ["guardian_name", "guardian name"], ["pickup_point_id", "pickup point"],
+  ["buggy_pass_no", "buggy pass number"], ["photo_path", "photograph"], ["guardian_name", "guardian name"], ["pickup_point_id", "pickup point"],
   ["emergency_contact", "emergency contact"], ["address", "address"], ["valid_until", "valid-until date"],
 ];
 export const missingFor = st => REQUIRED.filter(([k]) => !st?.[k]).map(([, label]) => label);
@@ -203,6 +208,7 @@ export function cardData(p, photoUrl, qrText) {
   const s = p.students || p;
   return {
     pass_code: p.pass_code || "",
+    buggy_no: s.buggy_pass_no || "", term: s.pass_term || "",
     name: s.full_name || "", relation: s.guardian_relation || "S/O", guardian: s.guardian_name || "",
     class_line1: s.program || "", class_line2: s.department || "", uid: s.roll_number || "",
     pickup: s.pickup_points?.name || s.pickup || "",
@@ -223,8 +229,11 @@ export function cardFront(c, s) {
       <div class="bp-uni-name fit-box"><span class="fit-inner"><span style="color:${esc(s.name_color_1)}">${esc(w1)}</span>${rest.length ? ` <span style="color:${esc(s.name_color_2)}">${esc(rest.join(" "))}</span>` : ""}</span></div>
       ${s.tagline ? `<div class="bp-tagline fit" style="color:${esc(s.tagline_color)}">${esc(s.tagline)}</div>` : ""}
     </div>
-    <div class="bp-title fit">${esc(s.card_title)}</div>
-    <div class="bp-passno fit">${/^y/i.test(s.print_pass_no) ? esc(c.pass_code) : ""}</div>
+    <div class="bp-title fit">${esc(s.card_title)} <span data-out="buggy_no">${esc(c.buggy_no)}</span></div>
+    <div class="bp-term fit-box" data-out="term">${esc(c.term)}</div>
+    ${/^y/i.test(s.print_pass_no) ? `<div class="bp-passno fit">${esc(c.pass_code)}</div>` : ""}
+    ${/^(front|both)$/i.test(s.seal_position) ? `<div class="bp-front-seal">${s.seal_image ? `<img src="${esc(s.seal_image)}" alt="Seal">` : ""}</div>` : ""}
+    ${s.signatory_label ? `<div class="bp-signatory fit">${esc(s.signatory_label)}</div>` : ""}
     <div class="bp-photo"><img alt="" data-out-photo ${c.photo_url ? `src="${esc(c.photo_url)}"` : "hidden"}></div>
     <div class="bp-fields">
       ${row(esc(s.label_name), "name", c.name)}
@@ -251,7 +260,7 @@ export function cardBack(c, s) {
     <div class="bp-address fit-box" data-out="address">${c.address.map(esc).join("<br>")}</div>
     <div class="bp-return fit-box">${ret.join("")}</div>
     ${notes.length ? `<div class="bp-note fit-box"><span class="bp-note-label">${esc(s.note_label)}</span><div class="bp-note-lines">${notes.map(n => `<div>${esc(n)}</div>`).join("")}</div></div>` : ""}
-    <div class="bp-seal"><span>SEAL</span></div>
+    ${/^(back|both)$/i.test(s.seal_position || "back") ? `<div class="bp-seal">${s.seal_image ? `<img src="${esc(s.seal_image)}" alt="Seal">` : "<span>SEAL</span>"}</div>` : ""}
     <div class="bp-qr">${c.qr_svg || `<div class="bp-qr-placeholder">QR</div>`}${s.qr_caption ? `<div class="bp-qr-caption">${esc(s.qr_caption)}</div>` : ""}</div>
   </div>`;
 }
@@ -280,4 +289,26 @@ export async function loadCards(ids) {
     card: cardData(p, urls[p.students?.photo_path],
       p.qr_mode === "offline" ? payloads[p.id] : `${location.origin}/verify.html?t=${p.qr_token}`),
   }));
+}
+
+/* A4 "pairs" layout: each row = front | back, joined at a fold line (171.2 x 54 mm strip).
+   Cut the strip out, fold on the dashed line, laminate -> a double-sided card.
+   4 rows per A4 page. Coordinates in mm. */
+export const PAIR = { x0: 19.4, y0: 16, rowGap: 9, rows: 4 };
+export function pairSlots(n) {
+  return Array.from({ length: n }, (_, i) => [PAIR.x0, +(PAIR.y0 + i * (54 + PAIR.rowGap)).toFixed(1)]);
+}
+export function pairMarks(slots) {
+  // crop marks around each 171.2 x 54 strip + a dashed fold line in the middle
+  let l = "";
+  for (const [x, y] of slots) {
+    const W = 171.2;
+    for (const cx of [x, x + W]) for (const cy of [y, y + 54]) {
+      const sx = cx === x ? -1 : 1, sy = cy === y ? -1 : 1;
+      l += `<line x1="${cx + sx * 1.5}" y1="${cy}" x2="${cx + sx * 5.5}" y2="${cy}"/><line x1="${cx}" y1="${cy + sy * 1.5}" x2="${cx}" y2="${cy + sy * 4}"/>`;
+    }
+    const fx = x + 85.6;
+    l += `<line x1="${fx}" y1="${y - 4}" x2="${fx}" y2="${y - 1.5}"/><line x1="${fx}" y1="${y + 55.5}" x2="${fx}" y2="${y + 58}"/>`;
+  }
+  return `<svg class="bp-marks" viewBox="0 0 210 297" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${l}</svg>`;
 }

@@ -83,3 +83,26 @@
   .bp-logo:not(:has(img)), .bp-seal:not(:has(img)) { border: 0; }
   .bp-logo span, .bp-seal span { display: none; }
 }
+
+/* ---------- Buggy pass number, term, front seal (matches the issued card) ---------- */
+.bp-title span { font-size: 2.6mm; }
+.bp-term { position: absolute; left: 55.5mm; top: 8.3mm; width: 27mm; height: 6mm; font-size: 2.1mm;
+  font-weight: 700; line-height: 1.2; white-space: pre-line; }
+.bp-term:empty { display: none; }
+.bp-passno { top: 14.6mm; font-size: 1.8mm; color: #555; }
+/* Round seal at the lower right of the front, overlapping the field lines like a stamp. */
+.bp-front-seal { position: absolute; left: 64mm; top: 33.5mm; width: 16.5mm; height: 16.5mm; border-radius: 50%;
+  display: grid; place-items: center; }
+.bp-front-seal img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.bp-front-seal:not(:has(img)) { border: .25mm dashed #bbb; }
+.bp-signatory { position: absolute; left: 52mm; top: 50.4mm; width: 31mm; text-align: right;
+  font-size: 1.9mm; font-weight: 700; color: #222; }
+.bp-seal img { mix-blend-mode: multiply; }
+@media print { .bp-front-seal:not(:has(img)) { border: 0; } }
+
+/* ---------- Side-by-side print: front | back joined at a fold line ---------- */
+.bp-pair-slot { position: absolute; display: flex; width: 171.2mm; height: 54mm; }
+.bp-pair-slot .bp-card { border-radius: 0; }
+.bp-pair-slot::after { content: ""; position: absolute; left: 85.6mm; top: 0; bottom: 0;
+  border-left: .2mm dashed #9aa0a6; }          /* fold / cut guide between front and back */
+.bp-pair-page { position: relative; width: 210mm; height: 297mm; background: #fff; overflow: hidden; }

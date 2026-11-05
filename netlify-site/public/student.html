@@ -36,6 +36,8 @@
                 <select name="status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></label>
 
               <div class="form-section span-2">Bus pass details</div>
+              <label data-req="buggy_pass_no">Buggy pass no.<input name="buggy_pass_no" maxlength="20" placeholder="e.g. 38" autocomplete="off"></label>
+              <label>Term <span class="sub">(printed under the number)</span><input name="pass_term" maxlength="60" placeholder="e.g. (2026-2027) (06 Months)"></label>
               <div class="inline-pair">
                 <label class="relation">Relation
                   <select name="guardian_relation"><option>S/O</option><option>D/O</option><option>W/O</option><option>C/O</option></select></label>
@@ -142,7 +144,8 @@
     const c = cardData({ expires_at: v("valid_until") }, photoUrl, null);
     Object.assign(c, { name: v("full_name"), relation: v("guardian_relation"), guardian: v("guardian_name"),
       class_line1: v("program"), class_line2: v("department"), uid: v("roll_number"), pickup: v("pickup_point"),
-      emergency: v("emergency_contact"), address: v("address").split("\n").map(s => s.trim()).filter(Boolean) });
+      emergency: v("emergency_contact"), address: v("address").split("\n").map(s => s.trim()).filter(Boolean),
+      buggy_no: v("buggy_pass_no"), term: v("pass_term") });
     $("#pvFront").innerHTML = cardFront(c, settings);
     $("#pvBack").innerHTML = cardBack(c, settings);
     window.BuggyCard?.zoomCards(); window.BuggyCard?.fitCards();
@@ -207,6 +210,7 @@
       valid_until: t("valid_until") || null, status: t("status") || "active",
       guardian_relation: t("guardian_relation") || "S/O", guardian_name: t("guardian_name") || null,
       emergency_contact: t("emergency_contact") || null, address: address.join("\n") || null,
+      buggy_pass_no: t("buggy_pass_no").replace(/\s+/g, " ") || null, pass_term: t("pass_term").replace(/\s+/g, " ") || null,
     };
     const errors = [];
     if (!d.full_name) errors.push("Full name is required.");

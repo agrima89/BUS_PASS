@@ -15,11 +15,31 @@
     <div class="flashes" id="flash"></div>
     <section class="content">
       <div class="settings-layout">
+        <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-head"><h2>Official seal</h2></div>
+          <p class="hint" style="margin-top:0">Upload a clean scan of the department's official seal, supplied by the issuing office.
+            Until one is uploaded, the seal area prints blank so the card can be stamped by hand.</p>
+          <div class="asset-row" style="border-top:0">
+            <div class="asset-thumb round" id="sealThumb"><span>None</span></div>
+            <div class="grow">
+              <input type="file" id="sealFile" accept="image/png,image/jpeg,image/webp" aria-label="Seal image">
+              <label class="check" style="margin:8px 0"><input type="checkbox" id="sealKnockout" checked> Remove white paper background</label>
+              <span class="field-error" id="sealError" hidden></span>
+              <div class="form-actions" style="justify-content:flex-start;margin-top:8px">
+                <button class="btn btn-sm btn-primary" id="sealSave" disabled>Save seal</button>
+                <button class="btn btn-sm btn-danger" id="sealRemove" hidden>Remove seal</button>
+              </div>
+              <p class="hint">Choose where it prints with <b>Where to print the seal</b> (back / front / both / none) in the settings.</p>
+            </div>
+          </div>
+        </div>
         <div class="card">
           <div class="card-head"><h2>Pickup points</h2></div>
           <p class="hint" style="margin-top:0">Stops are added automatically when typed on a student's form. Use this list to tidy them.</p>
           <form class="search" id="addStop"><input name="name" maxlength="80" placeholder="Add a stop" aria-label="New stop" required><button class="btn btn-primary">＋ Add</button></form>
           <div id="stops"><p class="empty">Loading…</p></div>
+        </div>
         </div>
         <div class="card">
           <form id="settingsForm"></form>
@@ -54,6 +74,7 @@
       v = multi ? v.split("\n").map(l => l.trim()).join("\n").trim() : v.replace(/\s+/g, " ").trim();
       if (v.length > max) errors.push(`${label} is too long (max ${max}).`);
       if (/color/.test(k) && v && !/^#[0-9a-fA-F]{6}$/.test(v)) errors.push(`${label} must be a colour like #CE1A19.`);
+      if (k === "seal_position" && v && !/^(back|front|both|none)$/i.test(v)) errors.push("Seal position must be back, front, both or none.");
       rows.push({ key: k, value: v });
     }
     if (!rows.find(r => r.key === "uni_name").value) errors.push("University name can't be empty.");
@@ -93,7 +114,57 @@
     e.target.reset(); renderStops();
   });
 
-  try { await Promise.all([renderSettings(), renderStops()]); } catch (e) { flash(errText(e), "error"); }
+  /* ---------- official seal (stored as a PNG data URL in settings.seal_image) ---------- */
+  let sealData = null;
+  const showSeal = url => { $("#sealThumb").innerHTML = url ? `<img src="${esc(url)}" alt="Seal">` : "<span>None</span>"; };
+  async function loadSeal() {
+    const { data } = await sb.from("settings").select("value").eq("key", "seal_image").maybeSingle();
+    showSeal(data?.value || ""); $("#sealRemove").hidden = !data?.value;
+  }
+  async function prepareSeal(file, knockout) {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, 500 / Math.max(bmp.width, bmp.height));
+    const c = Object.assign(document.createElement("canvas"), { width: Math.round(bmp.width * scale), height: Math.round(bmp.height * scale) });
+    const ctx = c.getContext("2d");
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    if (knockout) {                         // near-white paper -> transparent, soft edge
+      const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const light = Math.min(d[i], d[i + 1], d[i + 2]);
+        if (light > 235) d[i + 3] = 0; else if (light > 200) d[i + 3] = Math.round(255 * (235 - light) / 35);
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    return c.toDataURL("image/png");
+  }
+  const sealErr = m => { $("#sealError").textContent = m || ""; $("#sealError").hidden = !m; };
+  async function onSealPicked() {
+    sealErr(""); sealData = null; $("#sealSave").disabled = true;
+    const f = $("#sealFile").files[0];
+    if (!f) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) return sealErr("Please choose a PNG, JPG or WEBP image.");
+    try {
+      sealData = await prepareSeal(f, $("#sealKnockout").checked);
+      if (sealData.length > 900000) { sealData = null; return sealErr("This image is too detailed. Please crop it closer to the seal and try again."); }
+      showSeal(sealData); $("#sealSave").disabled = false;
+    } catch { sealErr("That file couldn't be read as an image."); }
+  }
+  $("#sealFile").addEventListener("change", onSealPicked);
+  $("#sealKnockout").addEventListener("change", onSealPicked);
+  $("#sealSave").onclick = async () => {
+    if (!sealData) return;
+    const { error } = await sb.from("settings").upsert({ key: "seal_image", value: sealData });
+    if (error) return flash(errText(error), "error");
+    flash("Seal saved. It now prints on every card."); $("#sealSave").disabled = true; $("#sealRemove").hidden = false;
+  };
+  $("#sealRemove").onclick = async () => {
+    if (!confirm("Remove the seal from the cards?")) return;
+    const { error } = await sb.from("settings").delete().eq("key", "seal_image");
+    if (error) return flash(errText(error), "error");
+    $("#sealFile").value = ""; sealData = null; showSeal(""); $("#sealRemove").hidden = true; flash("Seal removed.");
+  };
+
+  try { await Promise.all([renderSettings(), renderStops(), loadSeal()]); } catch (e) { flash(errText(e), "error"); }
 </script>
 </body>
 </html>

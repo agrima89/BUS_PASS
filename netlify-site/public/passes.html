@@ -18,7 +18,7 @@
         <div class="toolbar">
           <label class="check"><input type="checkbox" id="selectAll"> Select all valid</label>
           <span class="sub" id="selCount">0 selected</span>
-          <button class="btn btn-primary" id="printSel" disabled>⎙ Print selected (4 per A4, two-sided)</button>
+          <button class="btn btn-primary" id="printSel" disabled>⎙ Print selected (front | back, 4 per A4)</button>
         </div>
         <div id="list"><p class="empty">Loading…</p></div>
       </div>
@@ -52,7 +52,7 @@
     };
     boxes.forEach(b => b.onchange = update);
     $("#selectAll").onchange = e => { boxes.forEach(b => (b.checked = e.target.checked)); update(); };
-    $("#printSel").onclick = () => location.assign(`/print.html?layout=a4&ids=${boxes.filter(b => b.checked).map(b => b.value).join(",")}`);
+    $("#printSel").onclick = () => location.assign(`/print.html?layout=pairs&ids=${boxes.filter(b => b.checked).map(b => b.value).join(",")}`);
   } catch (e) { flash(errText(e), "error"); }
 </script>
 </body>

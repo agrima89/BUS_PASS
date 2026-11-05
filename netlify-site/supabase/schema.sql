@@ -34,6 +34,8 @@ create table if not exists public.students (
   emergency_contact text check (char_length(emergency_contact) <= 20),
   address           text check (char_length(address) <= 300),
   photo_path        text,                                                                 -- object in the 'photos' bucket
+  buggy_pass_no     text check (char_length(buggy_pass_no) <= 20),                         -- entered by the admin, e.g. 38
+  pass_term         text check (char_length(pass_term) <= 60),                             -- e.g. (2026-2027) (06 Months)
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
@@ -48,6 +50,9 @@ create table if not exists public.passes (
   status     text not null default 'valid' check (status in ('valid','revoked','expired')),
   qr_mode    text not null default 'offline' check (qr_mode in ('online','offline'))
 );
+create unique index if not exists students_buggy_pass_no_unique
+  on public.students (lower(buggy_pass_no)) where buggy_pass_no is not null;
+
 -- At most one valid pass per student.
 create unique index if not exists passes_one_valid_per_student on public.passes (student_id) where status = 'valid';
 

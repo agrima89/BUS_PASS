@@ -27,6 +27,11 @@
 <body>
   <div class="print-bar">
     <span class="sub" id="info">Preparing…</span>
+    <select class="mini-select" id="layoutSel" hidden aria-label="Print layout">
+      <option value="pairs">Front | back on the same page</option>
+      <option value="duplex">Double-sided (fronts sheet, then backs sheet)</option>
+      <option value="card">Card printer (85.6 × 54 mm pages)</option>
+    </select>
     <button class="btn" id="mirrorBtn" hidden></button>
     <a class="btn" href="javascript:history.back()">← Back</a>
     <button class="btn btn-primary" id="printBtn" disabled>⎙ Print / Save as PDF</button>
@@ -37,9 +42,9 @@
 <script src="/vendor/qrcode-generator-1.4.4.js"></script>
 <script src="/js/cardfit.js"></script>
 <script type="module">
-  import { boot, esc, flash, errText, loadSettings, loadCards, cardFront, cardBack, cropMarks, missingFor, params, $ } from "/js/core.js";
+  import { boot, esc, flash, errText, loadSettings, loadCards, cardFront, cardBack, cropMarks, pairSlots, pairMarks, missingFor, params, $ } from "/js/core.js";
   await boot({ auth: true });
-  const layout = params.get("layout") === "single" ? "single" : "a4";
+  const layout = ["card", "duplex"].includes(params.get("layout")) ? params.get("layout") : "pairs";
   const mirror = params.get("mirror") !== "0";
   const ids = [...new Set((params.get("ids") || "").split(",").map(Number).filter(Number.isInteger))].slice(0, 200);
 
@@ -59,7 +64,18 @@
     if (incomplete.length) throw new Error(`Complete these students before printing: ${incomplete.join("; ")}.`);
 
     const area = $("#area");
-    if (layout === "single") {
+    if (layout === "pairs") {
+      let html = "";
+      for (let g = 0; g < items.length; g += 4) {
+        const group = items.slice(g, g + 4), slots = pairSlots(group.length);
+        html += `<div class="page-label">Page ${g / 4 + 1}: front | back</div><div class="page bp-pair-page">${
+          group.map((it, i) => `<div class="bp-pair-slot" style="left:${slots[i][0]}mm;top:${slots[i][1]}mm">${cardFront(it.card, settings)}${cardBack(it.card, settings)}</div>`).join("")
+        }${pairMarks(slots)}</div>`;
+      }
+      area.innerHTML = html;
+      $("#info").innerHTML = `${items.length} card(s) on ${Math.ceil(items.length / 4)} A4 page(s): front and back side by side. Cut along the corner marks, fold on the dashed line, then laminate.`;
+      $("#layoutSel").hidden = false;
+    } else if (layout === "card") {
       $("#pageSize").textContent = "@page { size: 85.6mm 54mm; margin: 0; }";
       const c = items[0].card;
       area.innerHTML = `<div class="page-label">Front</div><div class="page bp-single">${cardFront(c, settings)}</div>
@@ -78,11 +94,15 @@
       }
       area.innerHTML = html;
       $("#info").innerHTML = `${items.length} card(s) on ${Math.ceil(items.length / 4)} A4 sheet(s): fronts, then backs${mirror ? ", backs mirrored for long-edge duplex" : ""}.`;
+      $("#layoutSel").hidden = false;
       const mb = $("#mirrorBtn");
       mb.hidden = false; mb.textContent = mirror ? "Don’t mirror backs" : "Mirror backs";
       mb.onclick = () => { params.set("mirror", mirror ? "0" : "1"); location.search = params.toString(); };
     }
     $("#info").insertAdjacentHTML("beforeend", "<br>In the print dialog set <b>Scale 100%</b>, <b>Margins: None</b>, <b>Background graphics: on</b>. Choose <b>Save as PDF</b> for a PDF file.");
+    $("#layoutSel").value = layout;
+    $("#layoutSel").onchange = e => { params.set("layout", e.target.value); location.search = params.toString(); };
+    if (layout === "card") $("#layoutSel").hidden = false;
     // Wait for photos to load so nothing prints blank.
     await Promise.all([...document.images].map(img => img.complete ? 0 : new Promise(r => { img.onload = img.onerror = r; })));
     window.BuggyCard.fitCards();
