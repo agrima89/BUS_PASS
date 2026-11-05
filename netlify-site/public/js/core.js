@@ -45,7 +45,8 @@ export function errText(e) {
   const m = e?.message || String(e);
   if (/duplicate key.*roll_number/i.test(m)) return "A student with that UID already exists.";
   if (/duplicate key.*buggy_pass_no/i.test(m)) return "That buggy pass number is already given to another student.";
-  if (/column .*buggy_pass_no|pass_term.*does not exist|schema cache/i.test(m)) return "The database needs updating: run supabase/update-1-buggy-number.sql in Supabase (see SETUP.md).";
+  if (/(buggy_pass_no|pass_term).*(does not exist|schema cache)|schema cache.*(buggy_pass_no|pass_term)/i.test(m))
+    return `The database needs updating: run supabase/update-1-buggy-number.sql in the Supabase SQL Editor (it also refreshes the schema cache). Details: ${m}`;
   if (/Failed to fetch|NetworkError/i.test(m)) return "Can't reach the server. Check the internet connection and try again.";
   if (/JWT|not authenticated|401/i.test(m)) return "Your session expired. Please sign in again.";
   return m;

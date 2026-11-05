@@ -196,3 +196,6 @@ on conflict (id) do nothing;
 drop policy if exists staff_photos_all on storage.objects;
 create policy staff_photos_all on storage.objects for all to authenticated
   using (bucket_id = 'photos') with check (bucket_id = 'photos');
+
+-- Make the API notice schema changes immediately.
+notify pgrst, 'reload schema';
