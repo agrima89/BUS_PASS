@@ -1,0 +1,17 @@
+<div class="verdict verdict-{{ result.status }}">
+  {% if result.status == 'valid' %}✔ Valid pass
+  {% elif result.status == 'expired' %}⚠ Genuine, but the pass has expired
+  {% elif result.status == 'revoked' %}✖ Genuine, but the pass was revoked
+  {% elif result.status == 'not_found' %}✖ Unknown pass
+  {% else %}✖ Invalid or tampered QR code{% endif %}
+</div>
+{% if result.pass_code %}
+<dl class="dl">
+  <dt>Pass No.</dt><dd class="mono">{{ result.pass_code }}</dd>
+  <dt>Name</dt><dd>{{ result.name }}</dd>
+  <dt>UID</dt><dd class="mono">{{ result.roll }}</dd>
+  <dt>Program</dt><dd>{{ result.program }}</dd>
+  <dt>Valid until</dt><dd>{{ result.valid_until or '—' }}</dd>
+  <dt>QR type</dt><dd>{{ result.method|capitalize }}</dd>
+</dl>
+{% endif %}

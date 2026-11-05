@@ -1,0 +1,34 @@
+# Netlify configuration for the CU Bus Pass site.
+# No build step: plain HTML/CSS/JS in public/, serverless functions in netlify/functions/.
+
+[build]
+  publish   = "public"
+  functions = "netlify/functions"
+  command   = ""
+
+[functions]
+  node_bundler = "esbuild"
+
+# Security headers for every page.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "same-origin"
+    Permissions-Policy     = "camera=(self), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000"
+
+# Staff pages and API responses must never be cached by browsers or CDNs.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "no-cache"

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Check QR text{% endblock %}
+{% block heading %}Check QR text{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="{{ url_for('passes.scan') }}">📷 Use camera</a>{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <p class="hint" style="margin-top:0">Paste the text read from a pass QR code: an offline payload starting with <code>UPG1.</code>, or an online verify link. Use this if no camera is available.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field">QR content<textarea name="payload" rows="3" required></textarea></label>
+    <div class="form-actions"><button class="btn btn-primary">Check</button></div>
+  </form>
+  {% if result %}
+    {% include "passes/_verdict.html" %}
+  {% endif %}
+</div>
+{% endblock %}

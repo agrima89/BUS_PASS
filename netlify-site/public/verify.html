@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Pass verification · CU Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="center-page">
+  <div class="card verify-card">
+    <div class="brand" style="border:0;padding:0 0 14px">
+      <img class="brand-emblem" src="/img/cu-emblem.png" alt="CU logo">
+      <div><div class="brand-name" id="uniName">Chandigarh University</div><div class="brand-sub">Bus pass verification</div></div>
+    </div>
+    <div id="result"><p class="empty">Checking…</p></div>
+  </div>
+  <script src="/vendor/supabase-2.45.4.js"></script>
+  <script type="module">
+    // Public page (no sign-in). Uses only the verify_pass() database function,
+    // which returns non-private fields: never guardian, phone or address.
+    import { loadConfig, client, esc, dmy, $ } from "/js/core.js";
+    const LABEL = { valid: "✔ VALID PASS", expired: "⚠ PASS EXPIRED", revoked: "✖ PASS NOT VALID", not_found: "✖ UNKNOWN PASS" };
+    try {
+      const cfg = await loadConfig();
+      $("#uniName").textContent = cfg.universityName;
+      const token = new URLSearchParams(location.search).get("t") || "";
+      const { data, error } = await (await client()).rpc("verify_pass", { p_token: token });
+      if (error) throw error;
+      const r = data || { status: "not_found" };
+      $("#result").innerHTML = `<div class="verdict verdict-${esc(r.status)}">${LABEL[r.status] || esc(r.status)}</div>` + (r.pass_code ? `
+        <dl class="dl"><dt>Name</dt><dd>${esc(r.name)}</dd><dt>UID</dt><dd class="mono">${esc(r.uid)}</dd>
+        <dt>Program</dt><dd>${esc(r.program)}</dd><dt>Pass No.</dt><dd class="mono">${esc(r.pass_code)}</dd>
+        <dt>Valid until</dt><dd>${esc(dmy(r.valid_until) || "—")}</dd></dl>`
+        : `<p class="empty">This QR code doesn't match any pass issued by this system.</p>`);
+    } catch (e) {
+      $("#result").innerHTML = `<div class="verdict verdict-error">Couldn't check right now</div><p class="empty">${esc(e.message)}</p>`;
+    }
+  </script>
+</body>
+</html>

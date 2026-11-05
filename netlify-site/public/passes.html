@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Issued passes · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1>Issued passes</h1></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="card">
+        <div class="toolbar">
+          <label class="check"><input type="checkbox" id="selectAll"> Select all valid</label>
+          <span class="sub" id="selCount">0 selected</span>
+          <button class="btn btn-primary" id="printSel" disabled>⎙ Print selected (4 per A4, two-sided)</button>
+        </div>
+        <div id="list"><p class="empty">Loading…</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, dmy, $, $$ } from "/js/core.js";
+  const { sb } = await boot({ active: "passes" });
+  try {
+    const { data, error } = await sb.from("passes")
+      .select("id, pass_code, qr_mode, issued_at, expires_at, status, students(full_name, roll_number)")
+      .order("id", { ascending: false });
+    if (error) throw error;
+    $("#list").innerHTML = data.length ? `<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Pass No.</th><th>Student</th><th>QR</th><th>Issued</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>${
+      data.map(p => `<tr>
+        <td>${p.status === "valid" ? `<input type="checkbox" class="sel" value="${p.id}" aria-label="Select ${esc(p.pass_code)}">` : ""}</td>
+        <td class="mono">${esc(p.pass_code)}</td>
+        <td>${esc(p.students?.full_name)}<div class="sub mono">${esc(p.students?.roll_number)}</div></td>
+        <td>${esc(p.qr_mode)}</td><td>${esc(dmy(p.issued_at))}</td><td>${esc(dmy(p.expires_at) || "—")}</td>
+        <td><span class="badge badge-${esc(p.status)}">${esc(p.status)}</span></td>
+        <td class="row-actions"><a class="btn btn-sm" href="/pass.html?id=${p.id}">Open</a></td></tr>`).join("")
+    }</tbody></table></div>` : `<p class="empty">No passes yet. They're created when a student's details are complete. <a href="/student.html">Add a student</a>.</p>`;
+
+    const boxes = $$(".sel");
+    const update = () => {
+      const n = boxes.filter(b => b.checked).length;
+      $("#selCount").textContent = `${n} selected · ${Math.ceil(n / 4)} sheet(s)`;
+      $("#printSel").disabled = !n;
+    };
+    boxes.forEach(b => b.onchange = update);
+    $("#selectAll").onchange = e => { boxes.forEach(b => (b.checked = e.target.checked)); update(); };
+    $("#printSel").onclick = () => location.assign(`/print.html?layout=a4&ids=${boxes.filter(b => b.checked).map(b => b.value).join(",")}`);
+  } catch (e) { flash(errText(e), "error"); }
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+{#
+  Buggy pass, two sides, laid out in real millimetres (CR80: 85.6 x 54 mm).
+  `c` = card data (services/buggy_card.card_data), `s` = card settings.
+  data-out attributes let the student form's live preview fill in values as you type.
+#}
+
+{% macro front(c, s) %}
+<div class="bp-card bp-front">
+  <div class="bp-logo">
+    {% if s.logo %}<img src="{{ url_for('settings.asset', kind='logo') }}" alt="Logo">{% else %}<span>LOGO</span>{% endif %}
+  </div>
+  <div class="bp-uni">
+    {% set words = s.uni_name.split(' ', 1) %}
+    <div class="bp-uni-name fit-box"><span class="fit-inner"><span style="color: {{ s.name_color_1 or '#222' }}">{{ words[0] }}</span>{% if words|length > 1 %} <span style="color: {{ s.name_color_2 or '#222' }}">{{ words[1] }}</span>{% endif %}</span></div>
+    {% if s.tagline %}<div class="bp-tagline fit" style="color: {{ s.tagline_color or '#333' }}">{{ s.tagline }}</div>{% endif %}
+  </div>
+  <div class="bp-title fit">{{ s.card_title }}</div>
+  <div class="bp-passno fit">{% if config.PRINT_PASS_NUMBER %}{{ c.pass_code }}{% endif %}</div>
+
+  <div class="bp-photo">
+    {% if c.photo_url %}<img src="{{ c.photo_url }}" alt="" data-out-photo>{% else %}<img alt="" data-out-photo hidden>{% endif %}
+  </div>
+
+  <div class="bp-fields">
+    <div class="bp-row"><span class="bp-label">{{ s.label_name }}</span><span class="bp-val fit" data-out="name">{{ c.name }}</span></div>
+    <div class="bp-row"><span class="bp-label"><span data-out="relation">{{ c.relation }}</span>:</span><span class="bp-val fit" data-out="guardian">{{ c.guardian }}</span></div>
+    <div class="bp-row"><span class="bp-label">{{ s.label_class }}</span><span class="bp-val fit" data-out="class_line1">{{ c.class_line1 }}</span></div>
+    <div class="bp-row"><span class="bp-val fit" data-out="class_line2">{{ c.class_line2 }}</span></div>
+    <div class="bp-row"><span class="bp-label">{{ s.label_uid }}</span><span class="bp-val fit" data-out="uid">{{ c.uid }}</span></div>
+    <div class="bp-row"><span class="bp-label">{{ s.label_pickup }}</span><span class="bp-val fit" data-out="pickup">{{ c.pickup }}</span></div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro back(c, s) %}
+<div class="bp-card bp-back">
+  <div class="bp-frame"></div>
+
+  <div class="bp-valid fit"><span>{{ s.label_valid }}</span> <b data-out="valid">{{ c.valid }}</b></div>
+  <div class="bp-emergency fit"><span>{{ s.label_emergency }}</span> <span data-out="emergency">{{ c.emergency }}</span></div>
+  <div class="bp-addr-label">{{ s.label_address }}</div>
+  <div class="bp-address fit-box" data-out="address">{% for line in c.address %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>
+
+  <div class="bp-return fit-box">
+    {% for line in (s.return_text or '').split('\n') if line %}<div>{{ line }}</div>{% endfor %}
+    {% if s.contact_label or s.contact_value %}<div>{{ s.contact_label }} {{ s.contact_value }}</div>{% endif %}
+    {% if s.helpline_label or s.helpline_value %}<div>{{ s.helpline_label }} {{ s.helpline_value }}</div>{% endif %}
+  </div>
+
+  {% set notes = (s.note_lines or '').split('\n') | select | list %}
+  {% if notes %}
+  <div class="bp-note fit-box">
+    <span class="bp-note-label">{{ s.note_label }}</span>
+    <div class="bp-note-lines">{% for line in notes %}<div>{{ line }}</div>{% endfor %}</div>
+  </div>
+  {% endif %}
+
+  <div class="bp-seal">
+    {% if s.seal %}<img src="{{ url_for('settings.asset', kind='seal') }}" alt="Seal">{% else %}<span>SEAL</span>{% endif %}
+  </div>
+
+  <div class="bp-qr">
+    {% if c.qr_svg %}{{ c.qr_svg }}{% else %}<div class="bp-qr-placeholder">QR</div>{% endif %}
+    {% if s.qr_caption %}<div class="bp-qr-caption">{{ s.qr_caption }}</div>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{# Crop marks for an A4 sheet: an SVG overlay in mm, drawn outside each card's corners. #}
+{% macro crop_marks(slots) %}
+<svg class="bp-marks" viewBox="0 0 210 297" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  {% for x, y in slots %}
+    {% for cx in [x, x + 85.6] %}{% for cy in [y, y + 54] %}
+      {% set sx = -1 if cx == x else 1 %}{% set sy = -1 if cy == y else 1 %}
+      <line x1="{{ cx + sx * 1.5 }}" y1="{{ cy }}" x2="{{ cx + sx * 5.5 }}" y2="{{ cy }}" />
+      <line x1="{{ cx }}" y1="{{ cy + sy * 1.5 }}" x2="{{ cx }}" y2="{{ cy + sy * 5.5 }}" />
+    {% endfor %}{% endfor %}
+  {% endfor %}
+</svg>
+{% endmacro %}

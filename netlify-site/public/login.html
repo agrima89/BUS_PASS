@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · CU Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="center-page">
+  <div class="card login-card">
+    <div class="brand" style="border:0;padding:0 0 18px">
+      <img class="brand-emblem" src="/img/cu-emblem.png" alt="CU logo">
+      <div><div class="brand-name" id="uniName">Chandigarh University</div><div class="brand-sub">Transport Dept. · Bus Pass</div></div>
+    </div>
+    <div id="flash"></div>
+    <form id="loginForm">
+      <label class="field">Email<input name="email" type="email" autocomplete="username" required autofocus></label>
+      <label class="field">Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
+    </form>
+    <p class="hint">Accounts are created by the administrator in Supabase. There is no public sign-up.</p>
+  </div>
+  <script src="/vendor/supabase-2.45.4.js"></script>
+  <script type="module">
+    import { client, loadConfig, flash, errText, $ } from "/js/core.js";
+    const next = new URLSearchParams(location.search).get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    try {
+      const cfg = await loadConfig();
+      $("#uniName").textContent = cfg.universityName;
+      const sb = await client();
+      if ((await sb.auth.getSession()).data.session) location.replace(safeNext);
+      $("#loginForm").addEventListener("submit", async e => {
+        e.preventDefault();
+        const btn = $("#loginBtn"); btn.disabled = true; btn.textContent = "Signing in…";
+        $("#flash").replaceChildren();
+        const f = new FormData(e.target);
+        const { error } = await sb.auth.signInWithPassword({ email: f.get("email"), password: f.get("password") });
+        if (error) {
+          flash(/invalid/i.test(error.message) ? "Wrong email or password." : errText(error), "error");
+          btn.disabled = false; btn.textContent = "Sign in";
+        } else location.replace(safeNext);
+      });
+    } catch (e) { flash(errText(e), "error"); }
+  </script>
+</body>
+</html>

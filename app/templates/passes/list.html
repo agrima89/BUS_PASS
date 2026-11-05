@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Passes{% endblock %}
+{% block heading %}Passes{% endblock %}
+{% block content %}
+<div class="card">
+  {% if passes %}
+  <form method="get" action="{{ url_for('passes.print_sheet') }}" id="sheetForm">
+    <div class="toolbar">
+      <label class="check"><input type="checkbox" id="selectAll"> Select all valid</label>
+      <span class="sub" id="selCount">0 selected</span>
+      <button class="btn btn-primary" id="printSel" disabled>⎙ Print selected (4 per A4, two-sided)</button>
+      <button class="btn" formaction="{{ url_for('passes.print_sheet_classic') }}" id="pdfSel" disabled>Classic design</button>
+    </div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th></th><th>Pass No.</th><th>Student</th><th>QR</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for p in passes %}
+      <tr>
+        <td>{% if p.status == 'valid' %}<input type="checkbox" class="sel" name="ids" value="{{ p.id }}" aria-label="Select {{ p.pass_code }}">{% endif %}</td>
+        <td class="mono">{{ p.pass_code }}</td>
+        <td>{{ p.full_name }}<div class="sub mono">{{ p.roll_number }}</div></td>
+        <td>{{ p.qr_mode|capitalize }}</td>
+        <td>{{ p.issued_at[:10] }}</td>
+        <td>{{ p.expires_at or '—' }}</td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td class="row-actions"><a class="btn btn-sm" href="{{ url_for('passes.detail', pass_id=p.id) }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  </form>
+  <script>
+    (() => {
+      const boxes = [...document.querySelectorAll(".sel")], all = document.getElementById("selectAll");
+      const update = () => {
+        const n = boxes.filter(b => b.checked).length;
+        document.getElementById("selCount").textContent = `${n} selected · ${Math.ceil(n / 4)} page(s)`;
+        document.getElementById("printSel").disabled = document.getElementById("pdfSel").disabled = !n;
+      };
+      boxes.forEach(b => b.addEventListener("change", update));
+      all.addEventListener("change", () => { boxes.forEach(b => b.checked = all.checked); update(); });
+      update();
+    })();
+  </script>
+  {% else %}
+    <p class="empty">No passes yet. Issue one from the <a href="{{ url_for('students.list_students') }}">Students</a> page.</p>
+  {% endif %}
+</div>
+{% endblock %}

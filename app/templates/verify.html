@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Pass verification · {{ university_short }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="center-page">
+  <div class="card verify-card">
+    <div class="brand" style="border:0;padding:0 0 14px">
+      <img class="brand-emblem" src="{{ url_for('static', filename='img/cu-emblem.png') }}" alt="{{ university_short }} logo">
+      <div><div class="brand-name">{{ university_name }}</div><div class="brand-sub">Pass verification</div></div>
+    </div>
+    <div class="verdict verdict-{{ status }}">
+      {% if status == 'valid' %}✔ VALID PASS
+      {% elif status == 'expired' %}⚠ PASS EXPIRED
+      {% elif status == 'revoked' %}✖ PASS NOT VALID
+      {% else %}✖ UNKNOWN PASS{% endif %}
+    </div>
+    {% if row %}
+      {% if status == 'valid' and row.photo_path %}
+        <img class="verify-photo" src="{{ url_for('verify.photo', token=token) }}" alt="Card holder photo">
+      {% endif %}
+      <dl class="dl">
+        <dt>Name</dt><dd>{{ row.full_name }}</dd>
+        <dt>UID</dt><dd class="mono">{{ row.roll_number }}</dd>
+        <dt>Program</dt><dd>{{ row.program }}</dd>
+        <dt>Pass No.</dt><dd class="mono">{{ row.pass_code }}</dd>
+        <dt>Valid until</dt><dd>{{ row.expires_at or '—' }}</dd>
+      </dl>
+    {% else %}
+      <p class="empty">This QR code does not match any pass issued by this system.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

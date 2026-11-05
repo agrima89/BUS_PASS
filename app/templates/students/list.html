@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+{% block heading %}Students{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="{{ url_for('students.create') }}">＋ Add Student</a>{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="search" method="get">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name, UID, program or pickup point…">
+    <button class="btn">Search</button>
+    {% if q %}<a class="btn btn-ghost" href="{{ url_for('students.list_students') }}">Clear</a>{% endif %}
+  </form>
+
+  {% if students %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th></th><th>Name</th><th>UID</th><th>Class / Program</th><th>Pickup point</th><th>Valid until</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for s in students %}
+      <tr>
+        <td class="thumb-cell">{% if s.photo_path %}<img class="thumb" src="{{ url_for('students.photo', student_id=s.id) }}" alt="" loading="lazy">{% else %}<div class="thumb thumb-empty">{{ s.full_name[:1] }}</div>{% endif %}</td>
+        <td>{{ s.full_name }}<div class="sub">{{ s.department or '' }}</div></td>
+        <td class="mono">{{ s.roll_number }}</td>
+        <td>{{ s.program }}</td>
+        <td>{{ s.pickup_point or '—' }}</td>
+        <td>{{ s.valid_until or '—' }}</td>
+        <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+        <td class="row-actions">
+          {% if s.pass_id %}<a class="btn btn-sm" href="{{ url_for('passes.detail', pass_id=s.pass_id) }}">View pass</a>{% endif %}
+          {% if s.status == 'active' and missing[s.id] %}
+          <a class="btn btn-sm btn-warn" href="{{ url_for('students.edit', student_id=s.id) }}" title="Missing: {{ missing[s.id]|join(', ') }}">⚠ Incomplete ({{ missing[s.id]|length }})</a>
+          {% elif s.status == 'active' %}
+          <form method="post" action="{{ url_for('passes.issue', student_id=s.id) }}" class="issue-form"{% if s.pass_id %} data-confirm="Issue a new pass? The current pass will be revoked."{% endif %}>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="qr_mode" class="mini-select" aria-label="QR mode"><option value="offline">Offline QR</option><option value="online">Online QR</option></select>
+            <button class="btn btn-sm btn-primary">{{ 'Reissue' if s.pass_id else 'Issue pass' }}</button>
+          </form>
+          {% endif %}
+          <a class="btn btn-sm" href="{{ url_for('students.edit', student_id=s.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('students.delete', student_id=s.id) }}" data-confirm="Delete {{ s.full_name }}? This cannot be undone.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+    <p class="empty">{% if q %}No students match “{{ q }}”.{% else %}No students yet.{% endif %}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Card Settings{% endblock %}
+{% block heading %}Card Settings{% endblock %}
+{% block content %}
+<div class="settings-layout">
+  <div class="card">
+    <div class="card-head"><h2>Official images</h2></div>
+    <p class="hint" style="margin-top:0">Upload only official files supplied by the university. Until then, the card shows an empty outlined slot.</p>
+    {% for kind, title in [('logo', 'Logo (front, top-left)'), ('seal', 'Seal (back, top-right)')] %}
+    <div class="asset-row">
+      <div class="asset-thumb {{ 'round' if kind == 'seal' }}">
+        {% if s[kind] %}<img src="{{ url_for('settings.asset', kind=kind) }}" alt="{{ kind }}">{% else %}<span>None</span>{% endif %}
+      </div>
+      <div class="grow">
+        <b>{{ title }}</b>
+        <form method="post" action="{{ url_for('settings.upload_asset', kind=kind) }}" enctype="multipart/form-data" class="asset-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="file" name="file" accept="image/png,image/jpeg,image/webp" aria-label="{{ title }} file">
+          <button class="btn btn-sm btn-primary">Upload</button>
+        </form>
+        {% if s[kind] %}
+        <form method="post" action="{{ url_for('settings.upload_asset', kind=kind) }}" data-confirm="Remove the {{ kind }}?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="remove" value="1">
+          <button class="btn btn-sm btn-danger">Remove</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% for section, heading in [('front', 'Front side'), ('back', 'Back side')] %}
+      <div class="form-section">{{ heading }}</div>
+      <div class="form-grid">
+        {% for key, f in fields.items() if f[3] == section %}
+          {% set val = form.get(key, s[key]) if form else s[key] %}
+          <label class="{{ 'span-2' if f[2] }}">{{ f[4] }}
+            {% if f[2] %}<textarea name="{{ key }}" rows="3" maxlength="{{ f[1] }}">{{ val or '' }}</textarea>
+            {% else %}<input name="{{ key }}" maxlength="{{ f[1] }}" value="{{ val or '' }}">{% endif %}
+          </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      <p class="hint">Blank fields are left off the card. The guardian label (S/O, D/O, W/O, C/O) is chosen per student on the student form.</p>
+      <div class="form-actions"><button class="btn btn-primary">Save settings</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

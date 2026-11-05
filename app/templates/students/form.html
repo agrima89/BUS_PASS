@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% import "cards/_buggy.html" as card %}
+{% macro need(key) %}{% if key in missing %}<span class="missing-tag">Missing</span>{% elif key in config.REQUIRED_FOR_PASS %}<span class="need" title="Needed to create the pass">●</span>{% endif %}{% endmacro %}
+{% set title_text = 'Add Student' if mode == 'create' else 'Edit Student' %}
+{% block title %}{{ title_text }}{% endblock %}
+{% block heading %}{{ title_text }}{% endblock %}
+{% block content %}
+<div class="form-layout">
+<div class="card form-card">
+  {% if missing %}
+  <div class="pending-banner" id="pendingBanner">
+    <b>✓ Student saved, but the bus pass isn't created yet.</b>
+    <span>Fill in: <strong>{{ missing_labels|join(', ') }}</strong>, then press <b>Save &amp; create pass</b>.</span>
+  </div>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data" novalidate id="studentForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <label>Full name *<input name="full_name" required maxlength="120" value="{{ student.full_name or '' }}" data-preview="name"></label>
+      <label>UID *<input name="roll_number" required maxlength="40" value="{{ student.roll_number or '' }}" data-preview="roll"></label>
+      <label>Class / Program *<input name="program" required maxlength="80" placeholder="e.g. B.Tech" value="{{ student.program or '' }}" data-preview="program"></label>
+      <label>Branch / Department<input name="department" maxlength="80" placeholder="e.g. CSE" value="{{ student.department or '' }}" data-preview="department"></label>
+      <label>Year of study<input name="year_of_study" type="number" min="1" max="8" value="{{ student.year_of_study or '' }}" data-preview="year"></label>
+      <label>Valid until {{ need("valid_until") }}<input name="valid_until" type="date" value="{{ student.valid_until or '' }}" data-preview="valid"></label>
+      <label>Email<input name="email" type="email" maxlength="120" value="{{ student.email or '' }}"></label>
+      <label>Phone<input name="phone" maxlength="20" value="{{ student.phone or '' }}"></label>
+      <label>Blood group
+        <select name="blood_group" data-preview="blood">
+          {% for bg in blood_groups %}<option value="{{ bg }}" {{ 'selected' if (student.blood_group or '') == bg }}>{{ bg or '—' }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Status
+        <select name="status">
+          {% for st in statuses %}<option value="{{ st }}" {{ 'selected' if (student.status or 'active') == st }}>{{ st|capitalize }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="form-section span-2">Buggy pass details</div>
+      <div class="inline-pair">
+        <label class="relation">Relation
+          <select name="guardian_relation" aria-label="Relation to guardian">
+            {% for r in relations %}<option value="{{ r }}" {{ 'selected' if (student.guardian_relation or 'S/O') == r }}>{{ r }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="grow">Guardian name {{ need("guardian_name") }}<input name="guardian_name" maxlength="120" value="{{ student.guardian_name or '' }}" placeholder="Father / mother / guardian"></label>
+      </div>
+      <label>Pickup point {{ need("pickup_point") }}
+        <input name="pickup_point" list="pickupList" maxlength="80" autocomplete="off"
+               placeholder="Type the bus stop, e.g. Kharar Bus Stand"
+               value="{{ student.pickup_point_text if student.pickup_point_text is defined else preview.pickup }}">
+        <datalist id="pickupList">{% for p in pickup_points %}<option value="{{ p.name|replace(' (hidden)', '') }}">{% endfor %}</datalist>
+        <span class="hint">Type any stop. Stops used before are suggested as you type.</span>
+      </label>
+      <label>Emergency contact no. {{ need("emergency_contact") }}<input name="emergency_contact" maxlength="20" inputmode="tel" value="{{ student.emergency_contact or '' }}"></label>
+      <label class="span-2">Address {{ need("address") }}<textarea name="address" rows="3" maxlength="300" placeholder="Up to 4 lines">{{ student.address or '' }}</textarea>
+        <span class="hint">Guardian name, emergency contact and address are private. They appear only on admin pages and the printed card, never on the public verify page or in QR codes.</span>
+      </label>
+      <label class="span-2">Photograph {{ need("photo") }}
+        <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" id="photoInput">
+        <span class="field-error" id="photoError" role="alert" hidden></span>
+        <span class="hint">JPG, PNG or WEBP, any size from a phone or camera; large photos are shrunk automatically before upload. It is cropped to a 3:4 portrait, and location and other metadata are removed.</span>
+      </label>
+      {% if mode == 'edit' and student.photo_path %}
+      <label class="check span-2"><input type="checkbox" name="remove_photo" value="1" id="removePhoto"> Remove current photo</label>
+      {% endif %}
+    </div>
+    <div class="save-bar">
+      <p class="hint"><span class="need">●</span> Needed for the pass. When everything marked is filled, saving creates the pass and its unique QR code automatically.</p>
+      <div class="form-actions">
+        {% if not has_pass %}
+        <label class="qr-choice">QR type
+          <select name="qr_mode" class="mini-select">
+            <option value="offline" selected>Offline: readable by any phone, no internet needed</option>
+            <option value="online">Online: scan opens the verify page (needs the app online)</option>
+          </select>
+        </label>
+        {% endif %}
+        <a class="btn btn-ghost" href="{{ url_for('students.list_students') }}">Cancel</a>
+        <button class="btn btn-primary">{{ 'Save changes' if has_pass else 'Save & create pass' }}</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card preview-panel">
+  <div class="card-head"><h2>Live card preview</h2>
+    <div class="seg" role="tablist">
+      <button type="button" class="seg-btn active" data-side="front">Front</button>
+      <button type="button" class="seg-btn" data-side="back">Back</button>
+    </div>
+  </div>
+  <div class="bp-zoom" data-side-panel="front">{{ card.front(preview, s) }}</div>
+  <div class="bp-zoom" data-side-panel="back" hidden>{{ card.back(preview, s) }}</div>
+  <p class="hint">Same template as printing (85.6 × 54 mm). The pass number and QR code are assigned when the pass is issued.
+    Wording and logo: <a href="{{ url_for('settings.index') }}">Card Settings</a>.</p>
+</div>
+</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/card.css') }}">
+<script src="{{ url_for('static', filename='js/cardfit.js') }}"></script>
+<script src="{{ url_for('static', filename='js/preview.js') }}"></script>
+{% endblock %}

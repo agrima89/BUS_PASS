@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/card.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1 id="pageTitle">New bus pass</h1></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="form-layout">
+        <div class="card form-card">
+          <div class="pending-banner" id="pendingBanner" hidden></div>
+          <form id="studentForm" novalidate>
+            <div class="form-grid">
+              <label>Full name *<input name="full_name" required maxlength="120"></label>
+              <label>UID *<input name="roll_number" required maxlength="40"></label>
+              <label>Class / Program *<input name="program" required maxlength="80" placeholder="e.g. B.Tech"></label>
+              <label>Branch / Department<input name="department" maxlength="80" placeholder="e.g. CSE"></label>
+              <label>Year of study<input name="year_of_study" type="number" min="1" max="8"></label>
+              <label data-req="valid_until">Valid until<input name="valid_until" type="date"></label>
+              <label>Email<input name="email" type="email" maxlength="120"></label>
+              <label>Phone<input name="phone" maxlength="20" inputmode="tel"></label>
+              <label>Blood group
+                <select name="blood_group"><option value="">—</option>${""}
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select></label>
+              <label>Status
+                <select name="status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></label>
+
+              <div class="form-section span-2">Bus pass details</div>
+              <div class="inline-pair">
+                <label class="relation">Relation
+                  <select name="guardian_relation"><option>S/O</option><option>D/O</option><option>W/O</option><option>C/O</option></select></label>
+                <label class="grow" data-req="guardian_name">Guardian name<input name="guardian_name" maxlength="120" placeholder="Father / mother / guardian"></label>
+              </div>
+              <label data-req="pickup_point_id">Pickup point
+                <input name="pickup_point" list="pickupList" maxlength="80" autocomplete="off" placeholder="Type the bus stop, e.g. Kharar Bus Stand">
+                <datalist id="pickupList"></datalist>
+                <span class="hint">Type any stop. Stops used before are suggested as you type.</span></label>
+              <label data-req="emergency_contact">Emergency contact no.<input name="emergency_contact" maxlength="20" inputmode="tel"></label>
+              <label class="span-2" data-req="address">Address<textarea name="address" rows="3" maxlength="300" placeholder="Up to 4 lines"></textarea>
+                <span class="hint">Guardian name, emergency contact and address appear only on staff pages and the printed card, never in QR codes or on the public verify page.</span></label>
+              <label class="span-2" data-req="photo_path">Photograph
+                <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" id="photoInput">
+                <span class="field-error" id="photoError" role="alert" hidden></span>
+                <span class="hint">Any size from a phone or camera. It is cropped to a portrait, shrunk and cleaned (location data removed) before upload.</span></label>
+              <label class="check span-2" id="removeWrap" hidden><input type="checkbox" id="removePhoto"> Remove current photo</label>
+            </div>
+
+            <div class="save-bar">
+              <p class="hint"><span class="need">●</span> Needed for the pass. When everything marked is filled, saving creates the pass and its unique QR code automatically.</p>
+              <div class="form-actions">
+                <label class="qr-choice" id="qrChoice">QR type
+                  <select name="qr_mode" class="mini-select">
+                    <option value="offline" selected>Offline: readable by any phone, no internet needed</option>
+                    <option value="online">Online: scan opens the verify page</option>
+                  </select></label>
+                <button type="button" class="btn btn-danger" id="deleteBtn" hidden>Delete</button>
+                <a class="btn btn-ghost" href="/students.html">Cancel</a>
+                <button class="btn btn-primary" id="saveBtn">Save &amp; create pass</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card preview-panel">
+          <div class="card-head"><h2>Live card preview</h2>
+            <div class="seg"><button type="button" class="seg-btn active" data-side="front">Front</button><button type="button" class="seg-btn" data-side="back">Back</button></div>
+          </div>
+          <div class="bp-zoom" data-side-panel="front" id="pvFront"></div>
+          <div class="bp-zoom" data-side-panel="back" id="pvBack" hidden></div>
+          <p class="hint">Same template as printing (85.6 × 54 mm). The QR code is created when the pass is issued.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script src="/vendor/qrcode-generator-1.4.4.js"></script>
+<script src="/js/cardfit.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, loadSettings, cardData, cardFront, cardBack, photoUrls, missingFor, REQUIRED, dmy, params, $, $$ } from "/js/core.js";
+  const { sb } = await boot({ active: params.get("id") ? "students" : "new" });
+  const form = $("#studentForm");
+  const id = Number(params.get("id")) || null;
+  let student = null, currentPass = null, newPhoto = null, settings, savedPhotoUrl = "", previewPhoto = null;
+
+  /* ---------- markers for fields needed by the pass ---------- */
+  $$("[data-req]").forEach(l => l.firstChild.after(Object.assign(document.createElement("span"), { className: "need", textContent: " ●", title: "Needed to create the pass" })));
+
+  /* ---------- load ---------- */
+  try {
+    settings = await loadSettings();
+    const { data: stops } = await sb.from("pickup_points").select("name").eq("active", true).order("name");
+    $("#pickupList").innerHTML = (stops || []).map(s => `<option value="${esc(s.name)}">`).join("");
+    if (id) {
+      const { data, error } = await sb.from("students").select("*, pickup_points(name), passes(id,status)").eq("id", id).single();
+      if (error) throw error;
+      student = data;
+      currentPass = data.passes?.find(p => p.status === "valid") || null;
+      for (const el of form.elements) if (el.name && el.name in data && el.type !== "file") el.value = data[el.name] ?? "";
+      form.elements.pickup_point.value = data.pickup_points?.name || "";
+      if (!data.guardian_relation) form.elements.guardian_relation.value = "S/O";
+      $("#pageTitle").textContent = "Edit student";
+      $("#deleteBtn").hidden = false;
+      $("#removeWrap").hidden = !data.photo_path;
+      if (currentPass) { $("#saveBtn").textContent = "Save changes"; $("#qrChoice").hidden = true; }
+      showMissing();
+    }
+    savedPhotoUrl = student?.photo_path ? (await photoUrls([student.photo_path]))[student.photo_path] || "" : "";
+    renderPreview(savedPhotoUrl);
+  } catch (e) { flash(errText(e), "error"); }
+
+  function showMissing() {
+    if (!student || currentPass) return;
+    const missing = missingFor(student);
+    $$("[data-req]").forEach(l => {
+      const miss = !student[l.dataset.req];
+      l.classList.toggle("is-missing", miss);
+      l.querySelector(".need").textContent = miss ? " MISSING" : " ●";
+      l.querySelector(".need").className = miss ? "missing-tag" : "need";
+    });
+    if (missing.length) {
+      const b = $("#pendingBanner");
+      b.hidden = false;
+      b.innerHTML = `<b>✓ Student saved, but the bus pass isn't created yet.</b><span>Fill in: <strong>${esc(missing.join(", "))}</strong>, then press <b>Save &amp; create pass</b>.</span>`;
+      b.scrollIntoView({ block: "start" });
+    }
+  }
+
+  /* ---------- live preview ---------- */
+  function renderPreview(photoUrl) {
+    const v = n => form.elements[n].value.trim();
+    const c = cardData({ expires_at: v("valid_until") }, photoUrl, null);
+    Object.assign(c, { name: v("full_name"), relation: v("guardian_relation"), guardian: v("guardian_name"),
+      class_line1: v("program"), class_line2: v("department"), uid: v("roll_number"), pickup: v("pickup_point"),
+      emergency: v("emergency_contact"), address: v("address").split("\n").map(s => s.trim()).filter(Boolean) });
+    $("#pvFront").innerHTML = cardFront(c, settings);
+    $("#pvBack").innerHTML = cardBack(c, settings);
+    window.BuggyCard?.zoomCards(); window.BuggyCard?.fitCards();
+  }
+  // Photo shown in the preview: a newly chosen one, else the saved one (unless "remove" is ticked).
+  const currentPhoto = () => previewPhoto ?? ($("#removePhoto").checked ? "" : savedPhotoUrl);
+  const refresh = () => renderPreview(currentPhoto());
+  form.addEventListener("input", e => { if (e.target.name !== "photo") refresh(); });
+  form.addEventListener("change", e => { if (e.target.name !== "photo") refresh(); });
+  $$(".seg-btn").forEach(btn => btn.onclick = () => {
+    $$(".seg-btn").forEach(b => b.classList.toggle("active", b === btn));
+    $$("[data-side-panel]").forEach(p => (p.hidden = p.dataset.sidePanel !== btn.dataset.side));
+    window.BuggyCard?.zoomCards(); window.BuggyCard?.fitCards();
+  });
+
+  /* ---------- photo: crop 3:4, 600x800 JPEG, metadata stripped ---------- */
+  const photoError = $("#photoError");
+  const showPhotoError = m => { photoError.textContent = m || ""; photoError.hidden = !m; };
+  async function normalisePhoto(file) {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    if (Math.min(bmp.width, bmp.height) < 200) throw new Error("Photo is too small (at least 200 pixels on the short side).");
+    const W = 600, H = 800, r = W / H;
+    let sw = bmp.width, sh = bmp.height;
+    if (sw / sh > r) sw = sh * r; else sh = sw / r;
+    const sx = (bmp.width - sw) / 2, sy = Math.max(0, (bmp.height - sh) * 0.35);   // bias toward the face
+    const c = Object.assign(document.createElement("canvas"), { width: W, height: H });
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, W, H);
+    return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("Couldn't process the photo.")), "image/jpeg", 0.9));
+  }
+  $("#photoInput").addEventListener("change", async e => {
+    showPhotoError(""); newPhoto = null; previewPhoto = null;
+    const f = e.target.files[0];
+    if (!f) return refresh();
+    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+      e.target.value = "";
+      return showPhotoError(`“${f.name}” is not a supported photo. Please choose a JPG, PNG or WEBP image.`);
+    }
+    $("#saveBtn").disabled = true;
+    try {
+      newPhoto = await normalisePhoto(f);
+      previewPhoto = URL.createObjectURL(newPhoto);
+      refresh();
+    } catch (err) {
+      e.target.value = "";
+      showPhotoError(err.message.includes("small") ? err.message : `“${f.name}” couldn't be read as a photo. Please try another image.`);
+    } finally { $("#saveBtn").disabled = false; }
+  });
+  $("#removePhoto").addEventListener("change", refresh);
+
+  /* ---------- validation (mirrors database constraints) ---------- */
+  const PHONE = /^[0-9+\-\s]{7,20}$/, EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  function collect() {
+    const f = Object.fromEntries(new FormData(form));
+    const t = k => String(f[k] ?? "").trim();
+    const address = t("address").split("\n").map(s => s.trim()).filter(Boolean);
+    const d = {
+      full_name: t("full_name"), roll_number: t("roll_number"), program: t("program"),
+      department: t("department") || null, year_of_study: t("year_of_study") ? Number(t("year_of_study")) : null,
+      email: t("email") || null, phone: t("phone") || null, blood_group: t("blood_group") || null,
+      valid_until: t("valid_until") || null, status: t("status") || "active",
+      guardian_relation: t("guardian_relation") || "S/O", guardian_name: t("guardian_name") || null,
+      emergency_contact: t("emergency_contact") || null, address: address.join("\n") || null,
+    };
+    const errors = [];
+    if (!d.full_name) errors.push("Full name is required.");
+    if (!d.roll_number) errors.push("UID is required.");
+    if (!d.program) errors.push("Class / Program is required.");
+    if (d.email && !EMAIL.test(d.email)) errors.push("Email address looks invalid.");
+    if (d.phone && !PHONE.test(d.phone)) errors.push("Phone number looks invalid.");
+    if (d.emergency_contact && !PHONE.test(d.emergency_contact)) errors.push("Emergency contact number looks invalid.");
+    if (d.year_of_study !== null && !(d.year_of_study >= 1 && d.year_of_study <= 8)) errors.push("Year of study must be 1–8.");
+    if (address.length > 4) errors.push("Address can have at most 4 lines.");
+    if (!d.guardian_name) d.guardian_relation = null;
+    return { d, errors, pickup: t("pickup_point").replace(/\s+/g, " "), mode: t("qr_mode") || "offline" };
+  }
+
+  async function pickupId(name) {
+    if (!name) return null;
+    if (name.length > 80) throw new Error("Pickup point is too long (max 80 characters).");
+    const like = name.replace(/[\\%_]/g, m => "\\" + m);              // exact, case-insensitive match
+    let { data } = await sb.from("pickup_points").select("id").ilike("name", like).limit(1);
+    if (data?.length) return data[0].id;
+    const ins = await sb.from("pickup_points").insert({ name }).select("id").single();
+    if (!ins.error) return ins.data.id;
+    ({ data } = await sb.from("pickup_points").select("id").ilike("name", like).limit(1));   // created meanwhile
+    if (data?.length) return data[0].id;
+    throw ins.error;
+  }
+
+  /* ---------- save ---------- */
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    $("#flash").replaceChildren();
+    if (!photoError.hidden) return photoError.scrollIntoView({ block: "center" });
+    const { d, errors, pickup, mode } = collect();
+    if (errors.length) { errors.forEach(m => flash(m, "error")); return; }
+    const btn = $("#saveBtn"); btn.disabled = true; const label = btn.textContent; btn.textContent = "Saving…";
+    let uploaded = null;
+    try {
+      d.pickup_point_id = await pickupId(pickup);
+      if (newPhoto) {
+        uploaded = `${crypto.randomUUID()}.jpg`;
+        const up = await sb.storage.from("photos").upload(uploaded, newPhoto, { contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+        d.photo_path = uploaded;
+      } else if ($("#removePhoto").checked) d.photo_path = null;
+
+      const q = id ? sb.from("students").update(d).eq("id", id) : sb.from("students").insert(d);
+      const { data: saved, error } = await q.select().single();
+      if (error) throw error;
+      if (student?.photo_path && "photo_path" in d && d.photo_path !== student.photo_path)
+        await sb.storage.from("photos").remove([student.photo_path]);
+
+      if (currentPass) {                      // keep the same QR; follow the validity date
+        await sb.from("passes").update({ expires_at: saved.valid_until }).eq("id", currentPass.id);
+        flash("Student updated.", "success", { persist: true });
+        return location.assign(`/pass.html?id=${currentPass.id}`);
+      }
+      const missing = missingFor(saved);
+      if (saved.status !== "active" || missing.length) {
+        flash("Student saved.", "success", { persist: true });
+        return location.assign(`/student.html?id=${saved.id}`);
+      }
+      const { data: passId, error: pe } = await sb.rpc("issue_pass", { p_student: saved.id, p_mode: mode });
+      if (pe) { flash(`Student saved, but the pass couldn't be created: ${errText(pe)}`, "error", { persist: true }); return location.assign(`/student.html?id=${saved.id}`); }
+      flash("Pass created with a unique QR code. Ready to print.", "success", { persist: true });
+      location.assign(`/pass.html?id=${passId}`);
+    } catch (err) {
+      if (uploaded) await sb.storage.from("photos").remove([uploaded]);   // no orphaned photos
+      flash(errText(err), "error");
+      btn.disabled = false; btn.textContent = label;
+    }
+  });
+
+  /* ---------- delete ---------- */
+  $("#deleteBtn").onclick = async () => {
+    if (!confirm(`Delete ${student.full_name}? Their passes are deleted too. This cannot be undone.`)) return;
+    const { error } = await sb.from("students").delete().eq("id", id);
+    if (error) return flash(errText(error), "error");
+    if (student.photo_path) await sb.storage.from("photos").remove([student.photo_path]);
+    flash(`Student ${student.full_name} deleted.`, "success", { persist: true });
+    location.assign("/students.html");
+  };
+</script>
+</body>
+</html>

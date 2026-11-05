@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Students · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1>Students</h1>
+      <div class="topbar-right"><a class="btn btn-primary" href="/student.html">＋ New bus pass</a></div></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="card">
+        <div class="search"><input type="search" id="q" placeholder="Search by name, UID, program or pickup point…" aria-label="Search"></div>
+        <div id="list"><p class="empty">Loading…</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, photoUrls, missingFor, dmy, $, $$ } from "/js/core.js";
+  const { sb } = await boot({ active: "students" });
+  let rows = [], urls = {};
+
+  async function load() {
+    const { data, error } = await sb.from("students")
+      .select("*, pickup_points(name), passes(id, status)").order("id", { ascending: false });
+    if (error) throw error;
+    rows = data;
+    urls = await photoUrls(rows.map(r => r.photo_path));
+    render();
+  }
+
+  function render() {
+    const q = $("#q").value.trim().toLowerCase();
+    const list = rows.filter(r => !q || [r.full_name, r.roll_number, r.program, r.pickup_points?.name]
+      .some(v => (v || "").toLowerCase().includes(q)));
+    if (!list.length) {
+      $("#list").innerHTML = `<p class="empty">${rows.length ? "No students match your search." : 'No students yet. <a href="/student.html">Add the first one.</a>'}</p>`;
+      return;
+    }
+    $("#list").innerHTML = `<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Name</th><th>UID</th><th>Class / Program</th><th>Pickup point</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>${
+      list.map(r => {
+        const pass = r.passes?.find(p => p.status === "valid");
+        const missing = missingFor(r);
+        const thumb = urls[r.photo_path] ? `<img class="thumb" src="${esc(urls[r.photo_path])}" alt="" loading="lazy">` : `<div class="thumb thumb-empty">${esc((r.full_name || "?")[0])}</div>`;
+        let action = "";
+        if (pass) action = `<a class="btn btn-sm btn-primary" href="/pass.html?id=${pass.id}">View pass</a>`;
+        else if (r.status !== "active") action = "";
+        else if (missing.length) action = `<a class="btn btn-sm btn-warn" href="/student.html?id=${r.id}" title="Missing: ${esc(missing.join(", "))}">⚠ Incomplete (${missing.length})</a>`;
+        else action = `<button class="btn btn-sm btn-primary" data-issue="${r.id}">Create pass</button>`;
+        return `<tr><td class="thumb-cell">${thumb}</td><td>${esc(r.full_name)}<div class="sub">${esc(r.department || "")}</div></td>
+          <td class="mono">${esc(r.roll_number)}</td><td>${esc(r.program)}</td><td>${esc(r.pickup_points?.name || "—")}</td>
+          <td>${esc(dmy(r.valid_until) || "—")}</td><td><span class="badge badge-${esc(r.status)}">${esc(r.status)}</span></td>
+          <td class="row-actions">${action}<a class="btn btn-sm" href="/student.html?id=${r.id}">Edit</a></td></tr>`;
+      }).join("")
+    }</tbody></table></div>`;
+    $$("[data-issue]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      const { data: id, error } = await sb.rpc("issue_pass", { p_student: Number(b.dataset.issue), p_mode: "offline" });
+      if (error) { flash(errText(error), "error"); b.disabled = false; return; }
+      flash("Pass created with a unique offline QR code.", "success", { persist: true });
+      location.href = `/pass.html?id=${id}`;
+    });
+  }
+
+  $("#q").addEventListener("input", render);
+  try { await load(); } catch (e) { flash(errText(e), "error"); }
+</script>
+</body>
+</html>

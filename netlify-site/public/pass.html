@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pass · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/card.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1 id="pageTitle">Pass</h1>
+      <div class="topbar-right" id="actions"></div></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="grid-2 pass-grid">
+        <div class="card">
+          <div class="bp-pair">
+            <div><p class="bp-side-label">Front</p><div class="bp-zoom" id="front"></div></div>
+            <div><p class="bp-side-label">Back</p><div class="bp-zoom" id="back"></div></div>
+          </div>
+          <p class="hint">Shown scaled to fit. It prints at 85.6 × 54 mm. For a PDF, click <b>Print card</b> and choose <b>Save as PDF</b>.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Details</h2><span id="statusBadge"></span></div>
+          <dl class="dl" id="details"></dl>
+          <div id="extra"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script src="/vendor/qrcode-generator-1.4.4.js"></script>
+<script src="/js/cardfit.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, loadSettings, loadCards, cardFront, cardBack, missingFor, dmy, params, $ } from "/js/core.js";
+  const { sb } = await boot({ active: "passes" });
+  const id = Number(params.get("id"));
+  try {
+    const [settings, [item]] = await Promise.all([loadSettings(), loadCards([id])]);
+    if (!item) throw new Error("Pass not found.");
+    const { pass: p, card } = item;
+    const s = p.students;
+    $("#pageTitle").textContent = `Pass ${p.pass_code}`;
+    $("#front").innerHTML = cardFront(card, settings);
+    $("#back").innerHTML = cardBack(card, settings);
+    window.BuggyCard.zoomCards(); window.BuggyCard.fitCards();
+    $("#statusBadge").innerHTML = `<span class="badge badge-${esc(p.status)}">${esc(p.status)}</span>`;
+    $("#details").innerHTML = `
+      <dt>Student</dt><dd><a href="/student.html?id=${s.id}">${esc(s.full_name)}</a> <span class="sub mono">${esc(s.roll_number)}</span></dd>
+      <dt>Pass No.</dt><dd class="mono">${esc(p.pass_code)}</dd>
+      <dt>Issued</dt><dd>${esc(dmy(p.issued_at))}</dd>
+      <dt>Valid until</dt><dd>${esc(dmy(p.expires_at) || "No expiry set")}</dd>
+      <dt>QR</dt><dd>${p.qr_mode === "offline" ? "Offline: readable by any phone, no internet needed" : "Online: opens the verify page"}</dd>`;
+    const missing = missingFor(s);
+    if (p.status === "valid") {
+      $("#actions").innerHTML = `<a class="btn" href="/print.html?layout=a4&ids=${p.id}">⎙ A4 sheet</a> <a class="btn btn-primary" href="/print.html?layout=single&ids=${p.id}">⎙ Print card</a>`;
+      $("#extra").innerHTML = (missing.length ? `<div class="flash flash-error">Now missing: ${esc(missing.join(", "))}. <a href="/student.html?id=${s.id}">Complete the record</a> before printing.</div>` : "") +
+        `<button class="btn btn-danger" id="revoke">Revoke pass</button>
+         <p class="hint">Revoking makes this QR show as not valid. To replace a lost card, revoke it, then use <b>Create pass</b> on the Students page.</p>`;
+      $("#revoke").onclick = async () => {
+        if (!confirm("Revoke this pass? Its QR code will show as not valid.")) return;
+        const { error } = await sb.from("passes").update({ status: "revoked" }).eq("id", id);
+        if (error) return flash(errText(error), "error");
+        flash("Pass revoked.", "success", { persist: true }); location.reload();
+      };
+    } else {
+      $("#extra").innerHTML = `<p class="hint">This pass is ${esc(p.status)}, so it can't be printed.</p>`;
+    }
+  } catch (e) { flash(errText(e), "error"); }
+</script>
+</body>
+</html>

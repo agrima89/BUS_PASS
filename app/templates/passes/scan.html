@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Scan QR{% endblock %}
+{% block heading %}Scan pass QR{% endblock %}
+{% block actions %}<a class="btn" href="{{ url_for('passes.check_offline') }}">Paste text instead</a>{% endblock %}
+{% block content %}
+<div class="scan-layout">
+  <div class="card">
+    <div class="scan-view">
+      <video id="video" playsinline muted></video>
+      <div class="scan-frame"></div>
+      <div class="scan-msg" id="scanMsg">Press <b>Start camera</b> to begin.</div>
+    </div>
+    <div class="form-actions" style="justify-content:flex-start">
+      <button class="btn btn-primary" id="startBtn">📷 Start camera</button>
+      <button class="btn" id="stopBtn" disabled>Stop</button>
+      <select id="camSelect" class="mini-select" hidden aria-label="Camera"></select>
+    </div>
+    <p class="hint">The camera works only on <b>https://</b> or <b>localhost</b>. Online and offline QR codes are both recognised. Every check is recorded.</p>
+  </div>
+
+  <div class="card scan-result" id="resultCard">
+    <div class="card-head"><h2>Result</h2><span class="sub" id="resultTime"></span></div>
+    <div id="resultBody"><p class="empty">Waiting for a QR code…</p></div>
+  </div>
+</div>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script src="{{ url_for('static', filename='vendor/jsQR-1.4.0.js') }}"></script>
+<script src="{{ url_for('static', filename='js/scan.js') }}" data-check-url="{{ url_for('passes.api_check') }}" id="scanScript"></script>
+{% endblock %}

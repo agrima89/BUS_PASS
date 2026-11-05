@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Pickup Points{% endblock %}
+{% block heading %}Pickup Points{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <form method="post" class="search">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input name="name" maxlength="80" placeholder="New pickup point name" required aria-label="Pickup point name">
+    <button class="btn btn-primary">＋ Add</button>
+  </form>
+  {% if points %}
+  <table class="table">
+    <thead><tr><th>Name</th><th>Students</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for p in points %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td>{{ p.used }}</td>
+        <td><span class="badge badge-{{ 'active' if p.active else 'inactive' }}">{{ 'active' if p.active else 'hidden' }}</span></td>
+        <td class="row-actions">
+          <form method="post" action="{{ url_for('pickup_points.toggle', point_id=p.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm">{{ 'Hide' if p.active else 'Show' }}</button>
+          </form>
+          {% if not p.used %}
+          <form method="post" action="{{ url_for('pickup_points.delete', point_id=p.id) }}" data-confirm="Delete “{{ p.name }}”?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty">No pickup points yet. Add the stops students can choose from.</p>
+  {% endif %}
+  <p class="hint">Hidden points stay on the students who already have them, but aren't offered for new selections. Points in use can't be deleted.</p>
+</div>
+{% endblock %}

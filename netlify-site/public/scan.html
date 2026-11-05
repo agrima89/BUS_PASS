@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scan QR · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1>Scan pass QR</h1></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="scan-layout">
+        <div class="card">
+          <div class="scan-view">
+            <video id="video" playsinline muted></video>
+            <div class="scan-frame"></div>
+            <div class="scan-msg" id="scanMsg">Press <b>Start camera</b> to begin.</div>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start">
+            <button class="btn btn-primary" id="startBtn">📷 Start camera</button>
+            <button class="btn" id="stopBtn" disabled>Stop</button>
+            <select id="camSelect" class="mini-select" hidden aria-label="Camera"></select>
+          </div>
+          <details class="paste">
+            <summary>No camera? Paste the QR text instead</summary>
+            <textarea id="pasteText" rows="5" placeholder="Paste what a phone's QR app shows"></textarea>
+            <button class="btn btn-sm" id="pasteBtn">Check</button>
+          </details>
+          <p class="hint">Checks offline QR codes (forged or edited ones are rejected) and online ones. Every check is recorded.</p>
+        </div>
+        <div class="card scan-result" id="resultCard">
+          <div class="card-head"><h2>Result</h2><span class="sub" id="resultTime"></span></div>
+          <div id="resultBody"><p class="empty">Waiting for a QR code…</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script src="/vendor/jsQR-1.4.0.js"></script>
+<script type="module">
+  import { boot, api, esc, dmy, photoUrls, errText, $ } from "/js/core.js";
+  await boot({ active: "scan" });
+  const video = $("#video"), msg = $("#scanMsg");
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let stream = null, raf = null, busy = false, last = "", lastAt = 0, detector = null;
+  if ("BarcodeDetector" in window) { try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch {} }
+  const LABEL = { valid: "✔ VALID PASS", expired: "⚠ PASS EXPIRED", revoked: "✖ PASS REVOKED",
+                  not_found: "✖ UNKNOWN PASS", invalid: "✖ FORGED OR EDITED QR", error: "✖ CHECK FAILED" };
+
+  async function show(r) {
+    $("#resultCard").className = `card scan-result result-${r.status}`;
+    let html = `<div class="verdict verdict-${esc(r.status)}">${LABEL[r.status] || esc(r.status)}</div>`;
+    if (r.photo_path) {
+      const url = (await photoUrls([r.photo_path]))[r.photo_path];
+      if (url) html += `<img class="verify-photo" src="${esc(url)}" alt="Card holder photo">`;
+    }
+    if (r.pass_code) html += `<dl class="dl"><dt>Name</dt><dd>${esc(r.name)}</dd><dt>UID</dt><dd class="mono">${esc(r.uid)}</dd>
+      <dt>Program</dt><dd>${esc(r.program)}</dd>${r.pickup ? `<dt>Pickup</dt><dd>${esc(r.pickup)}</dd>` : ""}
+      <dt>Pass No.</dt><dd class="mono">${esc(r.pass_code)}</dd><dt>Valid until</dt><dd>${esc(dmy(r.valid_until) || "—")}</dd>
+      <dt>QR type</dt><dd>${esc(r.method)}</dd></dl>`;
+    if (r.message) html += `<p class="empty">${esc(r.message)}</p>`;
+    $("#resultBody").innerHTML = html;
+    $("#resultTime").textContent = new Date().toLocaleTimeString();
+    navigator.vibrate?.(r.status === "valid" ? 80 : [80, 60, 80]);
+  }
+
+  async function check(text) {
+    const now = Date.now();
+    if (busy || (text === last && now - lastAt < 4000)) return;
+    busy = true; last = text; lastAt = now; msg.textContent = "Checking…";
+    try { await show(await api("/api/check", { text })); }
+    catch (e) { await show({ status: "error", message: errText(e) }); }
+    finally { busy = false; msg.textContent = "Point the camera at a pass QR code."; }
+  }
+
+  async function tick() {
+    if (!stream) return;
+    if (video.readyState >= 2 && !busy) {
+      try {
+        let text = null;
+        if (detector) text = (await detector.detect(video))[0]?.rawValue || null;
+        else {
+          const s = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
+          canvas.width = Math.round(video.videoWidth * s); canvas.height = Math.round(video.videoHeight * s);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          text = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" })?.data || null;
+        }
+        if (text) check(text);
+      } catch {}
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  async function start(deviceId) {
+    if (!navigator.mediaDevices?.getUserMedia) { msg.textContent = "Camera not available in this browser. Use the paste box below."; return; }
+    stop();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } } });
+    } catch (e) { msg.textContent = e.name === "NotAllowedError" ? "Camera permission was denied." : "Could not open the camera."; return; }
+    video.srcObject = stream; await video.play();
+    $("#startBtn").disabled = true; $("#stopBtn").disabled = false;
+    msg.textContent = "Point the camera at a pass QR code.";
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    if (cams.length > 1) {
+      $("#camSelect").innerHTML = cams.map((c, i) => `<option value="${esc(c.deviceId)}">${esc(c.label || `Camera ${i + 1}`)}</option>`).join("");
+      $("#camSelect").value = stream.getVideoTracks()[0]?.getSettings().deviceId || "";
+      $("#camSelect").hidden = false;
+    }
+    tick();
+  }
+  function stop() {
+    cancelAnimationFrame(raf); stream?.getTracks().forEach(t => t.stop());
+    stream = null; video.srcObject = null; $("#startBtn").disabled = false; $("#stopBtn").disabled = true;
+  }
+  $("#startBtn").onclick = () => start();
+  $("#stopBtn").onclick = () => { stop(); msg.textContent = "Camera stopped."; };
+  $("#camSelect").onchange = e => start(e.target.value);
+  $("#pasteBtn").onclick = () => { last = ""; check($("#pasteText").value); };
+  addEventListener("pagehide", stop);
+</script>
+</body>
+</html>

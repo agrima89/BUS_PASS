@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · {{ university_short }} Bus Pass</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="center-page">
+  <div class="card login-card">
+    <div class="brand" style="border:0;padding:0 0 18px">
+      <img class="brand-emblem" src="{{ url_for('static', filename='img/cu-emblem.png') }}" alt="{{ university_short }} logo">
+      <div><div class="brand-name">{{ university_name }}</div><div class="brand-sub">Transport Dept. · Bus Pass</div></div>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    {% if no_users %}
+      <div class="flash flash-error">No admin account exists yet. In a terminal run:<br><code>flask --app run create-admin</code></div>
+    {% endif %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field">Username<input name="username" autocomplete="username" required autofocus></label>
+      <label class="field">Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>

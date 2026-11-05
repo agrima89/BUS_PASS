@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1>Dashboard</h1></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="hero">
+        <img src="/img/cu-emblem.png" alt="CU logo">
+        <div><h2 id="heroTitle">Bus Pass Office</h2><p>Register students who use the university bus and print their passes.</p></div>
+        <div class="hero-actions">
+          <a class="btn" href="/scan.html">📷 Scan a pass</a>
+          <a class="btn btn-primary" href="/student.html">＋ New bus pass</a>
+        </div>
+      </div>
+      <div class="steps">
+        <a class="step" href="/student.html"><span class="step-num">1</span><span><b>Enter student details</b><span class="sub">Type the pickup point; add a photo</span></span></a>
+        <a class="step" href="/student.html"><span class="step-num">2</span><span><b>Save &amp; create pass</b><span class="sub">The unique offline QR is made automatically</span></span></a>
+        <a class="step" href="/passes.html"><span class="step-num">3</span><span><b>Print passes</b><span class="sub">One card or 4 per A4, both sides</span></span></a>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Total students</div><div class="stat-value" id="sTotal">–</div><div class="stat-accent a1"></div></div>
+        <div class="stat"><div class="stat-label">Active students</div><div class="stat-value" id="sActive">–</div><div class="stat-accent a2"></div></div>
+        <div class="stat"><div class="stat-label">Valid passes</div><div class="stat-value" id="sPasses">–</div><div class="stat-accent a3"></div></div>
+        <div class="stat"><div class="stat-label">QR checks</div><div class="stat-value" id="sChecks">–</div><div class="stat-accent a4"></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h2>Recently added</h2><a href="/students.html">View all →</a></div>
+          <div id="recent"><p class="empty">Loading…</p></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Students by pickup point</h2></div>
+          <div id="byStop"><p class="empty">Loading…</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, $ } from "/js/core.js";
+  const { sb, cfg } = await boot({ active: "dashboard" });
+  $("#heroTitle").textContent = `${cfg.universityName} · Bus Pass Office`;
+  try {
+    const count = async (q) => (await q).count ?? 0;
+    const head = { count: "exact", head: true };
+    const [total, active, passes, checks] = await Promise.all([
+      count(sb.from("students").select("id", head)),
+      count(sb.from("students").select("id", head).eq("status", "active")),
+      count(sb.from("passes").select("id", head).eq("status", "valid")),
+      count(sb.from("verifications").select("id", head)),
+    ]);
+    $("#sTotal").textContent = total; $("#sActive").textContent = active;
+    $("#sPasses").textContent = passes; $("#sChecks").textContent = checks;
+
+    const { data: recent, error } = await sb.from("students")
+      .select("id, full_name, roll_number, program, status").order("id", { ascending: false }).limit(6);
+    if (error) throw error;
+    $("#recent").innerHTML = recent.length ? `<table class="table"><thead><tr><th>Name</th><th>UID</th><th>Program</th><th>Status</th></tr></thead><tbody>${
+      recent.map(s => `<tr><td><a href="/student.html?id=${s.id}">${esc(s.full_name)}</a></td><td class="mono">${esc(s.roll_number)}</td><td>${esc(s.program)}</td><td><span class="badge badge-${esc(s.status)}">${esc(s.status)}</span></td></tr>`).join("")
+    }</tbody></table>` : `<p class="empty">No students yet. <a href="/student.html">Add the first one.</a></p>`;
+
+    const { data: stops } = await sb.from("students").select("pickup_points(name)");
+    const counts = {};
+    for (const s of stops || []) { const n = s.pickup_points?.name || "Not set"; counts[n] = (counts[n] || 0) + 1; }
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const max = top[0]?.[1] || 1;
+    $("#byStop").innerHTML = top.length ? top.map(([n, c]) => `<div class="bar-row"><span class="bar-label">${esc(n)}</span><div class="bar"><div class="bar-fill" style="width:${Math.round(c / max * 100)}%"></div></div><span class="bar-num">${c}</span></div>`).join("")
+      : `<p class="empty">Appears once students are added.</p>`;
+  } catch (e) { flash(errText(e), "error"); }
+</script>
+</body>
+</html>

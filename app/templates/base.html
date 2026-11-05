@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dashboard{% endblock %} · {{ university_short }} Bus Pass</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img class="brand-emblem" src="{{ url_for('static', filename='img/cu-emblem.png') }}" alt="{{ university_short }} logo">
+      <div>
+        <div class="brand-name">{{ university_name }}</div>
+        <div class="brand-sub">Transport Dept. · Bus Pass</div>
+      </div>
+    </div>
+    {% set ep = request.endpoint or '' %}
+    <nav class="nav">
+      <div class="nav-section">Overview</div>
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if ep == 'dashboard.index' }}">
+        <span class="ico">▦</span> Dashboard</a>
+      <div class="nav-section">Management</div>
+      <a href="{{ url_for('students.list_students') }}" class="{{ 'active' if ep.startswith('students.') and ep != 'students.create' }}">
+        <span class="ico">👥</span> Students</a>
+      <a href="{{ url_for('students.create') }}" class="{{ 'active' if ep == 'students.create' }}">
+        <span class="ico">＋</span> Add Student</a>
+      <a href="{{ url_for('pickup_points.index') }}" class="{{ 'active' if ep.startswith('pickup_points.') }}">
+        <span class="ico">📍</span> Pickup Points</a>
+      <div class="nav-section">Passes</div>
+      <a href="{{ url_for('passes.list_passes') }}" class="{{ 'active' if ep in ('passes.list_passes', 'passes.detail') }}">
+        <span class="ico">🪪</span> Issued Passes</a>
+      <a href="{{ url_for('passes.scan') }}" class="{{ 'active' if ep == 'passes.scan' }}">
+        <span class="ico">📷</span> Scan QR</a>
+      <a href="{{ url_for('passes.check_offline') }}" class="{{ 'active' if ep == 'passes.check_offline' }}">
+        <span class="ico">⌗</span> Check QR Text</a>
+      <div class="nav-section">Configuration</div>
+      <a href="{{ url_for('settings.index') }}" class="{{ 'active' if ep.startswith('settings.') }}">
+        <span class="ico">⚙</span> Card Settings</a>
+    </nav>
+    <div class="sidebar-foot">
+      {% if g.user %}<form method="post" action="{{ url_for('auth.logout') }}" class="logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span>Signed in as <b>{{ g.user.username }}</b></span>
+        <button class="btn btn-sm btn-ghost">Sign out</button>
+      </form>{% endif %}
+      <div>{{ university_name }} · Transport Department</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+      <h1>{% block heading %}Dashboard{% endblock %}</h1>
+      <div class="topbar-right">{% block actions %}{% endblock %}</div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}<button class="flash-x" aria-label="Dismiss">×</button></div>{% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="content">{% block content %}{% endblock %}</section>
+  </main>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

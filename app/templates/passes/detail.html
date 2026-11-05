@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "cards/_buggy.html" as card %}
+{% block title %}{{ p.pass_code }}{% endblock %}
+{% block heading %}Pass {{ p.pass_code }}{% endblock %}
+{% block actions %}
+  {% if p.status == 'valid' %}
+  <a class="btn" href="{{ url_for('passes.print_sheet', ids=p.id) }}">⎙ A4 duplex sheet</a>
+  <a class="btn btn-primary" href="{{ url_for('passes.print_single', pass_id=p.id) }}">⎙ Print card</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/card.css') }}">
+<div class="grid-2 pass-grid">
+  <div class="card">
+    {% if missing %}
+      <div class="flash flash-error">This student is now missing: {{ missing|join(', ') }}. <a href="{{ url_for('students.edit', student_id=p.student_id) }}">Complete the record</a> before printing.</div>
+    {% endif %}
+    <div class="bp-pair">
+      <div><p class="bp-side-label">Front</p><div class="bp-zoom">{{ card.front(c, s) }}</div></div>
+      <div><p class="bp-side-label">Back</p><div class="bp-zoom">{{ card.back(c, s) }}</div></div>
+    </div>
+    <p class="hint">Shown scaled to fit. It prints at 85.6 × 54 mm. For a PDF, use <b>Print card</b> and choose <b>Save as PDF</b>.
+      Wording, logo and seal are set under <a href="{{ url_for('settings.index') }}">Card Settings</a>.</p>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Details</h2><span class="badge badge-{{ p.status }}">{{ p.status }}</span></div>
+    <dl class="dl">
+      <dt>Student</dt><dd>{{ p.full_name }} <span class="sub mono">{{ p.roll_number }}</span></dd>
+      <dt>Issued</dt><dd>{{ p.issued_at }}</dd>
+      <dt>Expires</dt><dd>{{ p.expires_at or 'No expiry set' }}</dd>
+      <dt>QR mode</dt><dd>{{ p.qr_mode|capitalize }} (on the back){% if p.qr_mode == 'offline' %}: readable by any phone, no internet needed{% endif %}</dd>
+      {% if p.qr_mode == 'online' %}
+      <dt>Verify URL</dt><dd class="mono wrap"><a href="{{ url_for('verify.verify', token=p.qr_token) }}" target="_blank" rel="noopener">{{ verify_url }}</a></dd>
+      {% endif %}
+    </dl>
+    {% if p.qr_mode == 'online' and ('127.0.0.1' in verify_url or 'localhost' in verify_url) %}
+      <div class="flash flash-error">This online QR points to <b>{{ verify_url.split('/verify')[0] }}</b>, which phones can't open.
+        Reissue the pass with an <b>Offline</b> QR, or set <code>PUBLIC_BASE_URL</code> once the app is deployed online.</div>
+    {% endif %}
+    {% if p.status == 'valid' %}
+    <form method="post" action="{{ url_for('passes.revoke', pass_id=p.id) }}" data-confirm="Revoke this pass? Its QR code will show as invalid.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-danger">Revoke pass</button>
+    </form>
+    <p class="hint">Previous one-sided design: <a href="{{ url_for('passes.print_classic', pass_id=p.id) }}">classic print</a> ·
+      <a href="{{ url_for('passes.card_image', pass_id=p.id, download=1) }}">PNG</a> ·
+      <a href="{{ url_for('passes.card_pdf', pass_id=p.id, download=1) }}">PDF</a></p>
+    {% endif %}
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/cardfit.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% import "cards/_buggy.html" as card %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print · {{ university_short }} Buggy Pass</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/card.css') }}">
+  <style>
+    @page { size: {{ '85.6mm 54mm' if layout == 'single' else 'A4 portrait' }}; margin: 0; }
+    .print-area { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px 48px; overflow-x: auto; }
+    .page { background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.5); flex-shrink: 0; }
+    .page-label { color: var(--muted); font-size: 12px; margin-bottom: -16px; text-transform: uppercase; letter-spacing: .08em; }
+    .print-bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
+    .print-bar .sub { margin-right: auto; }
+    @media print {
+      html, body { background: #fff !important; }
+      .print-bar, .page-label { display: none; }
+      .print-area { padding: 0; gap: 0; display: block; }
+      .page { box-shadow: none; break-after: page; page-break-after: always; }
+      .page:last-child { break-after: auto; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <span class="sub">
+      {% if layout == 'single' %}
+        Buggy pass {{ cards[0].pass_code }}: page 1 front, page 2 back, each 85.6 × 54 mm. Use duplex printing on a card printer.
+      {% else %}
+        {{ cards|length }} card(s): {{ groups|length }} A4 sheet(s), fronts then backs{% if mirror %}, backs mirrored for long-edge duplex{% endif %}.
+      {% endif %}
+      <br>In the print dialog, set <b>Scale: 100%</b>, <b>Margins: None</b> and <b>Background graphics: on</b>. To get a PDF, choose <b>Save as PDF</b>.
+    </span>
+    {% if layout == 'a4' %}
+      <a class="btn" href="{{ url_for('passes.print_sheet', ids=ids, mirror=0 if mirror else 1) }}">{{ 'Don’t mirror backs' if mirror else 'Mirror backs' }}</a>
+      <a class="btn" href="{{ url_for('passes.list_passes') }}">← Back</a>
+    {% else %}
+      <a class="btn" href="{{ url_for('passes.detail', pass_id=pass_ids[0]) }}">← Back</a>
+    {% endif %}
+    <button class="btn btn-primary" id="printBtn">⎙ Print / Save as PDF</button>
+  </div>
+
+  <div class="print-area">
+    {% if layout == 'single' %}
+      <div class="page-label">Front</div>
+      <div class="page bp-single">{{ card.front(cards[0], s) }}</div>
+      <div class="page-label">Back</div>
+      <div class="page bp-single">{{ card.back(cards[0], s) }}</div>
+    {% else %}
+      {% for group in groups %}
+        <div class="page-label">Sheet {{ loop.index }}, fronts</div>
+        <div class="page bp-sheet">
+          {% for c in group %}{% set x, y = slots[loop.index0] %}
+            <div class="bp-slot" style="left: {{ x }}mm; top: {{ y }}mm">{{ card.front(c, s) }}</div>
+          {% endfor %}
+          {{ card.crop_marks(slots[:group|length]) }}
+        </div>
+        <div class="page-label">Sheet {{ loop.index }}, backs</div>
+        <div class="page bp-sheet">
+          {% for c in group %}{% set x, y = back_slots[loop.index0] %}
+            <div class="bp-slot" style="left: {{ x }}mm; top: {{ y }}mm">{{ card.back(c, s) }}</div>
+          {% endfor %}
+          {{ card.crop_marks(back_slots[:group|length]) }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+  <script src="{{ url_for('static', filename='js/cardfit.js') }}"></script>
+  <script>document.getElementById("printBtn").addEventListener("click", () => window.print());</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "name": "cu-bus-pass",
+  "private": true,
+  "description": "Chandigarh University Transport Dept. bus pass generator (Netlify + Supabase).",
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "node --test tests/functions.test.mjs" }
+}

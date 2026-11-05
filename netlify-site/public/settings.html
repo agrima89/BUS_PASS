@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Card settings · {short} Bus Pass</title>
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button><h1>Card settings &amp; stops</h1></header>
+    <div class="flashes" id="flash"></div>
+    <section class="content">
+      <div class="settings-layout">
+        <div class="card">
+          <div class="card-head"><h2>Pickup points</h2></div>
+          <p class="hint" style="margin-top:0">Stops are added automatically when typed on a student's form. Use this list to tidy them.</p>
+          <form class="search" id="addStop"><input name="name" maxlength="80" placeholder="Add a stop" aria-label="New stop" required><button class="btn btn-primary">＋ Add</button></form>
+          <div id="stops"><p class="empty">Loading…</p></div>
+        </div>
+        <div class="card">
+          <form id="settingsForm"></form>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script type="module">
+  import { boot, esc, flash, errText, loadSettings, SETTING_FIELDS, $, $$ } from "/js/core.js";
+  const { sb } = await boot({ active: "settings" });
+
+  /* ---------- card wording ---------- */
+  async function renderSettings() {
+    const s = await loadSettings();
+    const field = (k, [, max, multi, , label]) => `<label class="${multi ? "span-2" : ""}">${esc(label)}${multi
+      ? `<textarea name="${k}" rows="3" maxlength="${max}">${esc(s[k] ?? "")}</textarea>`
+      : `<input name="${k}" maxlength="${max}" value="${esc(s[k] ?? "")}">`}</label>`;
+    const sec = name => Object.entries(SETTING_FIELDS).filter(([, f]) => f[3] === name).map(([k, f]) => field(k, f)).join("");
+    $("#settingsForm").innerHTML = `
+      <div class="form-section">Front side</div><div class="form-grid">${sec("front")}</div>
+      <div class="form-section">Back side</div><div class="form-grid">${sec("back")}</div>
+      <p class="hint">Blank lines are left off the card. Official wording, contact and helpline numbers should come from the university.</p>
+      <div class="form-actions"><button class="btn btn-primary">Save settings</button></div>`;
+  }
+  $("#settingsForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const f = new FormData(e.target), rows = [], errors = [];
+    for (const [k, [, max, multi, , label]] of Object.entries(SETTING_FIELDS)) {
+      let v = String(f.get(k) ?? "").replace(/\r\n/g, "\n");
+      v = multi ? v.split("\n").map(l => l.trim()).join("\n").trim() : v.replace(/\s+/g, " ").trim();
+      if (v.length > max) errors.push(`${label} is too long (max ${max}).`);
+      if (/color/.test(k) && v && !/^#[0-9a-fA-F]{6}$/.test(v)) errors.push(`${label} must be a colour like #CE1A19.`);
+      rows.push({ key: k, value: v });
+    }
+    if (!rows.find(r => r.key === "uni_name").value) errors.push("University name can't be empty.");
+    if (errors.length) return errors.forEach(m => flash(m, "error"));
+    const { error } = await sb.from("settings").upsert(rows);
+    if (error) return flash(errText(error), "error");
+    flash("Card settings saved.");
+  });
+
+  /* ---------- pickup points ---------- */
+  async function renderStops() {
+    const { data, error } = await sb.from("pickup_points").select("id, name, active, students(count)").order("active", { ascending: false }).order("name");
+    if (error) throw error;
+    $("#stops").innerHTML = data.length ? `<table class="table"><thead><tr><th>Stop</th><th>Students</th><th></th></tr></thead><tbody>${
+      data.map(p => {
+        const used = p.students?.[0]?.count || 0;
+        return `<tr><td>${esc(p.name)} ${p.active ? "" : '<span class="badge badge-inactive">hidden</span>'}</td><td>${used}</td>
+          <td class="row-actions"><button class="btn btn-sm" data-toggle="${p.id}" data-active="${p.active}">${p.active ? "Hide" : "Show"}</button>
+          ${used ? "" : `<button class="btn btn-sm btn-danger" data-del="${p.id}" data-name="${esc(p.name)}">Delete</button>`}</td></tr>`;
+      }).join("")}</tbody></table>` : `<p class="empty">No stops yet.</p>`;
+    $$("[data-toggle]").forEach(b => b.onclick = async () => {
+      const { error } = await sb.from("pickup_points").update({ active: b.dataset.active !== "true" }).eq("id", b.dataset.toggle);
+      if (error) flash(errText(error), "error"); else renderStops();
+    });
+    $$("[data-del]").forEach(b => b.onclick = async () => {
+      if (!confirm(`Delete “${b.dataset.name}”?`)) return;
+      const { error } = await sb.from("pickup_points").delete().eq("id", b.dataset.del);
+      if (error) flash(errText(error), "error"); else renderStops();
+    });
+  }
+  $("#addStop").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = String(new FormData(e.target).get("name")).replace(/\s+/g, " ").trim();
+    if (!name) return;
+    const { error } = await sb.from("pickup_points").insert({ name });
+    if (error) return flash(/duplicate/i.test(error.message) ? "That stop already exists." : errText(error), "error");
+    e.target.reset(); renderStops();
+  });
+
+  try { await Promise.all([renderSettings(), renderStops()]); } catch (e) { flash(errText(e), "error"); }
+</script>
+</body>
+</html>
